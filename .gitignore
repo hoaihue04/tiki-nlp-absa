@@ -1,0 +1,93 @@
+# ════════════════════════════════════════
+# QUAN TRỌNG: Bảo mật
+# ════════════════════════════════════════
+.env                    # Chứa API keys - KHÔNG BAO GIỜ push lên GitHub
+*.key
+*.pem
+secrets/
+
+# ════════════════════════════════════════
+# Python
+# ════════════════════════════════════════
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+*.egg
+
+# ════════════════════════════════════════
+# Jupyter Notebook
+# ════════════════════════════════════════
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ════════════════════════════════════════
+# IDE / Editor
+# ════════════════════════════════════════
+.spyproject/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ════════════════════════════════════════
+# Dữ liệu lớn (không push lên GitHub)
+# ════════════════════════════════════════
+data/raw/
+data/interim/
+data/processed/
+data/asqp_split/
+
+# Nếu muốn giữ cấu trúc thư mục nhưng không push data:
+# (bỏ comment 4 dòng trên và dùng 4 dòng dưới)
+# !data/raw/.gitkeep
+# !data/interim/.gitkeep
+# !data/processed/.gitkeep
+# !data/asqp_split/.gitkeep
+
+# ════════════════════════════════════════
+# Model checkpoints (thường rất nặng)
+# ════════════════════════════════════════
+models/
+checkpoints/
+*.pt
+*.bin
+*.ckpt
+*.safetensors
+
+# ════════════════════════════════════════
+# Logs
+# ════════════════════════════════════════
+*.log
+logs/
+annotation.log
+
+# ════════════════════════════════════════
+# Power BI (file nhị phân, không cần track)
+# ════════════════════════════════════════
+*.pbix
+*.pbit
+
+# ════════════════════════════════════════
+# OS
+# ════════════════════════════════════════
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

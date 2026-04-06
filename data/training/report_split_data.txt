@@ -1,0 +1,90 @@
+============================================================
+CHUẨN BỊ DỮ LIỆU ASQP + TÍNH CLASS WEIGHTS
+============================================================
+✅ Đọc xong: 19925 reviews có quadruple | 523 NO_ASPECT bỏ qua
+
+====================================================
+📊 SENTIMENT DISTRIBUTION (TOÀN BỘ)
+====================================================
+  positive    :  30627 (80.15%)  ████████████████████████
+  negative    :   6539 (17.11%)  █████
+  neutral     :   1048 ( 2.74%)
+
+  📌 Tổng quadruples: 38214 | Reviews: 19925
+
+  Top 10 categories:
+    PRODUCT#QUALITY                     13687
+    DELIVERY#SPEED                       6443
+    DELIVERY#PACKAGING                   3511
+    PRICE#AFFORDABILITY                  3496
+    SELLER#SERVICE                       2011
+    PRODUCT#FUNCTION                     1556
+    PRODUCT#COMFORT                      1430
+    PRODUCT#DESIGN                       1352
+    DELIVERY#ACCURACY                    1021
+    PRODUCT#DURABILITY                    715
+📊 Split: train=15940 | val=1992 | test=1993
+
+====================================================
+⚖️  TÍNH CLASS WEIGHTS (chỉ từ tập TRAIN)
+====================================================
+
+  Sentiment weights:
+  Label                                  Count    Ratio    Weight
+  ----------------------------------------------------------------
+  neutral                                  833    2.72%   12.2665  █
+  negative                                5240   17.09%    1.9500  ███
+  positive                               24581   80.19%    0.4157  ████████████████
+
+  Category weights:
+  Label                                  Count    Ratio    Weight
+  ----------------------------------------------------------------
+  SELLER#RESPONSIVENESS                     48    0.16%   37.5662  █
+  PRICE#DISCOUNT                           146    0.48%   12.3505  █
+  PRODUCT#VALUE                            293    0.96%    6.1542  █
+  PRODUCT#SIZE                             312    1.02%    5.7794  █
+  PRODUCT#MATERIAL                         478    1.56%    3.7723  █
+  SELLER#AUTHENTICITY                      543    1.77%    3.3208  █
+  PRODUCT#SAFETY                           559    1.82%    3.2257  █
+  PRODUCT#DURABILITY                       575    1.88%    3.1360  █
+  DELIVERY#ACCURACY                        801    2.61%    2.2512  █
+  PRODUCT#DESIGN                          1082    3.53%    1.6665  █
+  PRODUCT#COMFORT                         1143    3.73%    1.5776  █
+  PRODUCT#FUNCTION                        1230    4.01%    1.4660  █
+  SELLER#SERVICE                          1605    5.24%    1.1235  █
+  DELIVERY#PACKAGING                      2846    9.28%    0.6336  █
+  PRICE#AFFORDABILITY                     2859    9.33%    0.6307  █
+  DELIVERY#SPEED                          5161   16.84%    0.3494  ███
+  PRODUCT#QUALITY                        10973   35.80%    0.1643  ███████
+
+  📋 Sentiment weights đã lưu vào label_map.json:
+     [0] positive     → 0.4157
+     [1] negative     → 1.9500
+     [2] neutral      → 12.2665
+
+====================================================
+💾 LƯU FILE DỮ LIỆU
+====================================================
+
+🔧 ViT5:
+  💾 vit5_train.csv  (15940 rows)
+  💾 vit5_val.csv  (1992 rows)
+  💾 vit5_test.csv  (1993 rows)
+
+🔧 PhoBERT:
+  💾 phobert_train.csv  (15940 reviews, 14040 term không tìm được vị trí)
+  💾 phobert_val.csv  (1992 reviews, 1789 term không tìm được vị trí)
+  💾 phobert_test.csv  (1993 reviews, 1728 term không tìm được vị trí)
+
+🔧 BiLSTM:
+  💾 bilstm_train.txt  (15940 reviews, 267223 tokens)
+  💾 bilstm_val.txt  (1992 reviews, 33519 tokens)
+  💾 bilstm_test.txt  (1993 reviews, 33498 tokens)
+
+============================================================
+✅ Hoàn tất! Tất cả file lưu tại: data/training/
+   label_map.json  — labels + class weights
+   phobert_*.csv   — dùng cho train_phobert.py
+   vit5_*.csv      — dùng cho train_vit5.py
+   bilstm_*.txt    — dùng cho train_bilstm.py
+============================================================

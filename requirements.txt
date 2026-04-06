@@ -1,0 +1,49 @@
+
+# ── Core ML / NLP ─────────────────────────────────────
+torch>=2.1.0
+transformers>=4.38.0
+sentencepiece>=0.1.99
+datasets>=2.16.0
+evaluate>=0.4.0
+accelerate>=0.26.0
+
+# ── Sequence Labeling ─────────────────────────────────
+torchcrf>=1.1.0
+seqeval>=1.2.2
+
+# ── Data Processing ───────────────────────────────────
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+regex
+
+# ── Vietnamese NLP ────────────────────────────────────
+pyvi
+underthesea
+
+# ── Crawling / Scraping ───────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+selenium
+fake-useragent
+
+# ── Visualization / Analysis ──────────────────────────
+matplotlib>=3.7.0
+seaborn
+plotly>=5.18.0
+
+# ── Web App / Demo ────────────────────────────────────
+streamlit>=1.30.0
+
+# ── Annotation / Labeling ─────────────────────────────
+label-studio
+
+# ── LLM APIs ──────────────────────────────────────────
+openai
+groq>=0.9.0
+
+# ── Utils ─────────────────────────────────────────────
+tqdm>=4.66.0
+python-dotenv>=1.0.0
+emoji
+rouge_score>=0.1.2
