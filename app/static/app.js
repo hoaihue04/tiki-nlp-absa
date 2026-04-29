@@ -1,14 +1,4 @@
 "use strict";
-
-/* ═══════════════════════════════════════════════════════
-   Tiki Insight — Frontend JS v4
-   Fixes:
-   · FIX 1: Hiển thị đầy đủ thông tin sản phẩm từ CSV (brand, seller, price...)
-   · FIX 2: Điểm mạnh/yếu — hiển thị bình luận đúng (positive/negative quote)
-   · FIX 3: Điểm yếu — không filter thêm ở frontend, tin tưởng backend
-   · FIX 4: Link gợi ý — chỉ dùng URL hợp lệ từ CSV, hiển thị rõ trạng thái
-   ═══════════════════════════════════════════════════════ */
-
 let stackedChart = null;
 let radarChart   = null;
 

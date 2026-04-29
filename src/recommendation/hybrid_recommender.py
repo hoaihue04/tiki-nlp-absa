@@ -2,17 +2,6 @@
 """
 Hybrid recommendation: ABSA (PhoBERT, rule-based aggregation) + CBF (TF-IDF cosine).
 
-Flow:
-1) Input product URL or product_id.
-2) Crawl/load reviews.
-3) Clean and normalize text.
-4) PhoBERT ABSA inference per sentence (aspect + sentiment + confidence).
-5) Compute dynamic alpha/beta for 2 cases:
-   - Few reviews.
-   - Noisy reviews.
-6) Build CBF scores from product content metadata.
-7) Final hybrid score and top-K ranking.
-8) Save charts and reports.
 """
 
 from __future__ import annotations

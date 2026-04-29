@@ -5,11 +5,6 @@ train_phobert.py — PhoBERT Multi-task cho ABSA (AD + AP)
 Kiến trúc (theo paper VLSP 2018):
     PhoBERT-base → Concat last 4 hidden layers → Linear(3072→768) → 17 heads
 
-Chiến lược tốt nhất từ bài báo:
-    - Concat last 4 BERT layers → F1 cao nhất (96.1% dev)
-    - Multi-task: 17 heads, mỗi head 4-class (none/pos/neu/neg)
-    - Focal Loss (γ=2) cho mất cân bằng, KHÔNG dùng class weights
-
 Checkpoint / Resume (Colab):
     - Lưu sau mỗi epoch vào checkpoints/phobert/epoch_{n}.pt
     - Best model theo avg(AD-F1 + AP-F1)
@@ -20,8 +15,7 @@ Cách chạy trên Colab:
     !python src/training/train_phobert.py
     # Nếu mất kết nối → chạy lại, sẽ tự resume
 
-Phụ thuộc:
-    pip install torch transformers sentencepiece scikit-learn numpy pandas
+
 """
 
 import json

@@ -1,7 +1,4 @@
-"""
-annotator.py — Concurrent Multi-Provider ASQP Annotator (v4)
 
-"""
 
 import json
 import logging

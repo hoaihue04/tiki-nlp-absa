@@ -4,16 +4,6 @@ evaluate_human_vs_llm.py
 =============================================================
 Đánh giá chất lượng annotation LLM so với nhãn thủ công (human).
 
-Xử lý đặc biệt:
-  - Human label dùng lẫn lộn alias tiếng Việt ("Tốc độ giao hàng")
-    và code gốc ("DELIVERY#SPEED") → tự động chuẩn hóa về code gốc
-  - LLM label ở dạng chuỗi trong trường llm_display → parse regex
-
-Đặt file : TIKI/src/data_labeling/evaluate_human_vs_llm.py
-
-Cách chạy (từ thư mục gốc TIKI/):
-    python src/data_labeling/evaluate_human_vs_llm.py
-
 Đầu vào:
     data/interim/human_labels_exported.json   ← export từ Label Studio
     data/interim/labelstudio_tasks.json       ← file tasks gốc (chứa LLM display)

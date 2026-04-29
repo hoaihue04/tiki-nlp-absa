@@ -1,15 +1,7 @@
 """
 =============================================================
-BƯỚC 1: CHUẨN BỊ DỮ LIỆU CHO LABEL STUDIO
-=============================================================
 Mục đích : Lấy mẫu ngẫu nhiên từ file JSONL (20.000 dòng)
            và chuyển sang định dạng JSON mà Label Studio đọc được.
-
-Đặt file : TIKI/src/data_labeling/step1_prepare_data.py
-
-Cách chạy (từ thư mục gốc TIKI/):
-    python src/data_labeling/step1_prepare_data.py
-
 Kết quả  : TIKI/data/interim/labelstudio_tasks.json
            TIKI/data/interim/sampled_ids.json
 =============================================================

@@ -7,22 +7,6 @@ Giải quyết vấn đề Colab mất kết nối / runtime reset:
     2. Sync checkpoints lên Drive sau mỗi epoch
     3. Khôi phục từ Drive khi restart
     4. Keep-alive script chống timeout
-
-Cách sử dụng trong Colab notebook:
-    from src.training.colab_utils import setup_colab, ColabTrainingWrapper
-
-    # Bước 1: Setup (chạy 1 lần đầu)
-    setup_colab(project_name='tiki-absa', drive_folder='MyDrive/tiki_absa')
-
-    # Bước 2: Chạy training (tự resume nếu có checkpoint)
-    !python src/training/train_phobert.py
-
-Hoặc dùng trực tiếp trong cell:
-    import sys
-    sys.path.insert(0, '/content/tiki')
-    from src.training.colab_utils import ColabAutoSync
-    sync = ColabAutoSync(local_dir='checkpoints/phobert',
-                         drive_dir='/content/drive/MyDrive/tiki_absa/phobert')
 """
 
 import os

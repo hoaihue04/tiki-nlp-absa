@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-DashboardService — Logic layer giữa FastAPI và PhoBERT/Hybrid Recommender.
-UPDATED v2.1: Live crawl từ Tiki API thay vì đọc CSV tĩnh.
-  - fetch_tiki_product_info_live()  → gọi /api/v2/products/{id}
-  - fetch_tiki_reviews_live()       → gọi /api/v2/reviews (phân trang)
-  - CSV vẫn được dùng như fallback cho recommendation candidates
-"""
 from __future__ import annotations
 
 import json

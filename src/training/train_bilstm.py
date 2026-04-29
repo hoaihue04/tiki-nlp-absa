@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""
-train_bilstm.py — BiLSTM-CRF cho ABSA (AD + AP) [OPTIMIZED]
-=============================================================
-Tối ưu so với phiên bản cũ:
-  1. HIDDEN_DIM 256→128  : LSTM nhanh ~4x (cost ∝ hidden²)
-  2. MAX_LEN 150→100     : padding ít hơn 33%, câu VN thường < 60 từ
-  3. BATCH_SIZE 64→128   : ít vòng optimizer hơn, GPU utilization cao hơn
-  4. Batched classifiers : 17 heads gộp 1 Linear thay vì 17 Sequential riêng
-  5. Mixed Precision AMP : ~1.5-2x nhanh trên T4/A100
-  6. num_workers=2       : data loading song song
-  7. Pre-compute IDs     : token/BIO IDs tính sẵn khi load, không tính lại mỗi batch
-  8. Eval mỗi 2 epoch    : giảm 50% thời gian evaluate
-  9. EPOCHS 40→25        : đủ hội tụ với early stopping patience=6
-
-Tổng ước tính: nhanh hơn ~4-6x so với phiên bản cũ.
-
-Cách chạy: python src/training/train_bilstm.py
-"""
 
 import json
 import os

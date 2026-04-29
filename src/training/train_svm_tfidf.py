@@ -20,9 +20,6 @@ Pipeline cho mỗi category i (0..16):
   │              (chỉ train trên samples có label != 0)       │
   └───────────────────────────────────────────────────────────┘
 
-Cách chạy trên Colab:
-    python src/training/train_svm_tfidf.py
-
 Output:
     models/svm/svm_model.pkl       — model đã train
     results/svm_results.json       — metrics trên test set

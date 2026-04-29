@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""
-Tiki ABSA + Hybrid Recommendation Dashboard — app.py
-v2.1: Live crawl từ Tiki API (không cần CSV review sẵn có)
-"""
+
 from __future__ import annotations
 
 import asyncio
