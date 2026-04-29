@@ -1,49 +1,93 @@
 
-# ── Core ML / NLP ─────────────────────────────────────
+
 torch>=2.1.0
 transformers>=4.38.0
-sentencepiece>=0.1.99
+sentencepiece>=0.1.99        # tokenizer cho ViT5 / T5
 datasets>=2.16.0
 evaluate>=0.4.0
-accelerate>=0.26.0
+accelerate>=0.26.0           # hỗ trợ Trainer (HuggingFace)
 
-# ── Sequence Labeling ─────────────────────────────────
-torchcrf>=1.1.0
-seqeval>=1.2.2
 
-# ── Data Processing ───────────────────────────────────
+torchcrf>=1.1.0              # CRF layer
+seqeval>=1.2.2               # evaluation NER/BIO
+
+# ======================================================
+
+# 📊 3. DATA PROCESSING
+
+# ======================================================
+
 pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
-regex
+regex                        # xử lý text nâng cao
 
-# ── Vietnamese NLP ────────────────────────────────────
+# ======================================================
+
+# 🇻🇳 4. VIETNAMESE NLP
+
+# ======================================================
+
 pyvi
 underthesea
 
-# ── Crawling / Scraping ───────────────────────────────
+# ======================================================
+
+# 🌐 5. CRAWLING / SCRAPING
+
+# ======================================================
+
 requests>=2.31.0
 beautifulsoup4>=4.12.0
-selenium
-fake-useragent
+selenium                     # crawl dynamic content (Tiki)
+fake-useragent              # tránh bị block
 
-# ── Visualization / Analysis ──────────────────────────
+# ======================================================
+
+# 📈 6. VISUALIZATION
+
+# ======================================================
+
 matplotlib>=3.7.0
 seaborn
 plotly>=5.18.0
 
-# ── Web App / Demo ────────────────────────────────────
-streamlit>=1.30.0
+# ======================================================
 
-# ── Annotation / Labeling ─────────────────────────────
+# 🖥️ 7. WEB APP / DASHBOARD
+
+# ======================================================
+
+streamlit>=1.30.0            # demo nhanh
+fastapi>=0.115.0             # backend API
+uvicorn>=0.30.0              # ASGI server
+jinja2>=3.1.0                # template HTML
+
+# ======================================================
+
+# 🏷️ 8. ANNOTATION / LABELING
+
+# ======================================================
+
 label-studio
 
-# ── LLM APIs ──────────────────────────────────────────
+# ======================================================
+
+# 🤖 9. LLM APIs (OPTIONAL)
+
+# ======================================================
+
 openai
 groq>=0.9.0
 
-# ── Utils ─────────────────────────────────────────────
+# ======================================================
+
+# 🧰 10. UTILS
+
+# ======================================================
+
 tqdm>=4.66.0
 python-dotenv>=1.0.0
-emoji
-rouge_score>=0.1.2
+emoji                       # xử lý emoji trong review
+rouge_score>=0.1.2          # metric cho generative model (ViT5)
+

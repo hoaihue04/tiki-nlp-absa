@@ -1,345 +1,551 @@
+#!/usr/bin/env python3
 """
-prepare_data.py
-===============
-Đọc asqp_annotated.jsonl → tạo dữ liệu cho 3 models + tính class weights.
+prepare_data.py — Chuẩn bị dữ liệu cho BiLSTM-CRF, PhoBERT, ViT5
+==================================================================
+Cách chạy (từ thư mục gốc dự án):
+    python src/training/prepare_data.py
 
-Cách chạy:
-  cd TIKI
-  python src/training/prepare_data.py
+Output (data/training/):
+    bilstm_{train,val,test}.txt   — BIO sequence format
+    phobert_{train,val,test}.csv  — text + 17 label columns
+    vit5_{train,val,test}.csv     — text + target string
+    vocab.json                    — từ điển cho BiLSTM
+    label_map.json                — ánh xạ category/sentiment
+    report_split_data.txt         — thống kê phân tách
+
+Chiến lược xử lý mất cân bằng (KHÔNG dùng class weights):
+    - Focal Loss được tích hợp trong các file train_*.py
+    - Oversampling: neutral x6, negative x2 (có word dropout)
+    - Oversampling chỉ áp dụng trên tập TRAIN để tránh data leakage
 """
 
-import json, os, random, csv
-from collections import Counter
+import json
+import os
+import csv
+import re
+import random
+import copy
+from collections import defaultdict, Counter
+from typing import List, Dict, Tuple
+import numpy as np
+from sklearn.model_selection import train_test_split
 
-# ─── Đường dẫn ───────────────────────────────────────────────────────────────
-JSONL_PATH  = "data/processed/asqp_annotated.jsonl"
-OUT_DIR     = "data/training"
-SEED        = 42
-TRAIN_RATIO = 0.8
-VAL_RATIO   = 0.1
-
-os.makedirs(OUT_DIR, exist_ok=True)
+# ── Seed ──────────────────────────────────────────────────────────────────
+SEED = 42
 random.seed(SEED)
+np.random.seed(SEED)
 
+# ── Danh sách 17 khía cạnh (thứ tự cố định) ───────────────────────────────
+CATEGORIES = [
+    'PRODUCT#QUALITY',       # 0
+    'DELIVERY#SPEED',        # 1
+    'DELIVERY#PACKAGING',    # 2
+    'PRICE#AFFORDABILITY',   # 3
+    'SELLER#SERVICE',        # 4
+    'PRODUCT#FUNCTION',      # 5
+    'PRODUCT#COMFORT',       # 6
+    'PRODUCT#DESIGN',        # 7
+    'DELIVERY#ACCURACY',     # 8
+    'PRODUCT#DURABILITY',    # 9
+    'PRODUCT#SAFETY',        # 10
+    'SELLER#AUTHENTICITY',   # 11
+    'PRODUCT#MATERIAL',      # 12
+    'PRODUCT#SIZE',          # 13
+    'PRODUCT#VALUE',         # 14
+    'PRICE#DISCOUNT',        # 15
+    'SELLER#RESPONSIVENESS', # 16
+]
+NUM_CATS   = len(CATEGORIES)
+CAT2IDX    = {c: i for i, c in enumerate(CATEGORIES)}
+IDX2CAT    = CATEGORIES  # list index = category index
 
-# ════════════════════════════════════════════════════════════════════════════
-# 1. ĐỌC DỮ LIỆU
-# ════════════════════════════════════════════════════════════════════════════
+# Sentiment encoding: 0=none, 1=positive, 2=neutral, 3=negative
+SENT2IDX   = {'none': 0, 'positive': 1, 'neutral': 2, 'negative': 3}
+IDX2SENT   = ['none', 'positive', 'neutral', 'negative']
 
-def load_jsonl(path):
-    valid, skipped = [], []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            obj = json.loads(line)
-            if obj.get("quadruples"):
-                valid.append(obj)
-            else:
-                skipped.append(obj)
-    print(f"✅ Đọc xong: {len(valid)} reviews có quadruple | "
-          f"{len(skipped)} NO_ASPECT bỏ qua")
-    return valid
-
-
-def split_data(data):
-    random.shuffle(data)
-    n       = len(data)
-    n_train = int(n * TRAIN_RATIO)
-    n_val   = int(n * VAL_RATIO)
-    train   = data[:n_train]
-    val     = data[n_train : n_train + n_val]
-    test    = data[n_train + n_val :]
-    print(f"📊 Split: train={len(train)} | val={len(val)} | test={len(test)}")
-    return train, val, test
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# 2. TÍNH CLASS WEIGHTS
-# ════════════════════════════════════════════════════════════════════════════
-#
-# Công thức balanced:  weight[c] = N_total / (N_classes × N_c)
-#
-# Với phân phối thực tế:
-#   positive: 80.15% →  N_c lớn  → weight nhỏ  ≈ 0.42
-#   negative: 17.11% →  N_c vừa  → weight vừa  ≈ 1.95
-#   neutral :  2.74% →  N_c nhỏ  → weight lớn  ≈ 12.17
-#
-# Kết quả: CrossEntropyLoss nhân weight vào mỗi sample
-# → model bị "phạt nặng" hơn khi đoán sai neutral
-
-def compute_class_weights(train_data, label_key, all_labels):
-    """
-    Tính class weight từ tập TRAIN (không dùng val/test để tránh leakage).
-
-    Trả về:
-      weights : dict {label_name: float}
-      counts  : Counter {label_name: int}
-    """
-    counts    = Counter(
-        q[label_key]
-        for item in train_data
-        for q in item["quadruples"]
-    )
-    n_total   = sum(counts.values())
-    n_classes = len(all_labels)
-    weights   = {}
-
-    for lbl in all_labels:
-        n_c = counts.get(lbl, 0)
-        if n_c == 0:
-            weights[lbl] = 0.0
-            print(f"  ⚠️  '{lbl}' không có mẫu train → weight = 0")
-        else:
-            weights[lbl] = n_total / (n_classes * n_c)
-
-    return weights, counts
-
-
-def print_weight_table(weights, counts, title):
-    total = sum(counts.values())
-    print(f"\n  {title}:")
-    print(f"  {'Label':<36} {'Count':>7}  {'Ratio':>7}  {'Weight':>8}")
-    print(f"  {'-'*64}")
-    for lbl, w in sorted(weights.items(), key=lambda x: -x[1]):
-        c     = counts.get(lbl, 0)
-        ratio = c / total * 100 if total else 0
-        bar   = "█" * max(1, int(ratio / 5))
-        print(f"  {lbl:<36} {c:>7d}  {ratio:>6.2f}%  {w:>8.4f}  {bar}")
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# 3. ĐỊNH DẠNG ViT5
-# ════════════════════════════════════════════════════════════════════════════
-
-SENTIMENT_VN = {
-    "positive": "tích cực",
-    "negative": "tiêu cực",
-    "neutral":  "trung lập",
+# ViT5 output format: "cat_vn:sent_vn | ..."
+# Vi du: "toc-do-giao-hang:tot | chat-luong-san-pham:te"
+SENT2VIT5 = {'positive': 'tot', 'neutral': 'tam', 'negative': 'te'}
+VIT5_CATEGORIES_VN = {
+    'PRODUCT#QUALITY':       'chat-luong-san-pham',
+    'DELIVERY#SPEED':        'toc-do-giao-hang',
+    'DELIVERY#PACKAGING':    'dong-goi-giao-hang',
+    'PRICE#AFFORDABILITY':   'gia-ca-san-pham',
+    'SELLER#SERVICE':        'dich-vu-nguoi-ban',
+    'PRODUCT#FUNCTION':      'chuc-nang-san-pham',
+    'PRODUCT#COMFORT':       'su-thoai-mai',
+    'PRODUCT#DESIGN':        'thiet-ke-san-pham',
+    'DELIVERY#ACCURACY':     'do-chinh-xac-giao-hang',
+    'PRODUCT#DURABILITY':    'do-ben-san-pham',
+    'PRODUCT#SAFETY':        'an-toan-san-pham',
+    'SELLER#AUTHENTICITY':   'hang-chinh-hang',
+    'PRODUCT#MATERIAL':      'chat-lieu-san-pham',
+    'PRODUCT#SIZE':          'kich-thuoc-san-pham',
+    'PRODUCT#VALUE':         'gia-tri-san-pham',
+    'PRICE#DISCOUNT':        'giam-gia-san-pham',
+    'SELLER#RESPONSIVENESS': 'phan-hoi-nguoi-ban',
 }
 
-def quads_to_vit5(quadruples):
-    return " | ".join(
-        f"({q['aspect_term']}, {q['aspect_category']}, "
-        f"{q['opinion_term']}, {SENTIMENT_VN.get(q['sentiment'], q['sentiment'])})"
-        for q in quadruples
-    )
+# BIO tags cho aspect term extraction (7 tags)
+BIO_TAGS = ['O',
+            'B-positive', 'I-positive',
+            'B-neutral',  'I-neutral',
+            'B-negative', 'I-negative']
+BIO2IDX  = {t: i for i, t in enumerate(BIO_TAGS)}
+
+# ── Paths ─────────────────────────────────────────────────────────────────
+INPUT_FILE = 'data/processed/asqp_annotated.jsonl'
+OUTPUT_DIR = 'data/training'
+
+# ── Tỷ lệ phân tách ───────────────────────────────────────────────────────
+TRAIN_RATIO = 0.70
+VAL_RATIO   = 0.15
+TEST_RATIO  = 0.15
+
+# ── Oversampling config ───────────────────────────────────────────────────
+NEUTRAL_OVERSAMPLE  = 6    # nhân 6 lần cho neutral
+NEGATIVE_OVERSAMPLE = 2    # nhân 2 lần cho negative
+WORD_DROPOUT_RATE   = 0.10 # xác suất drop từ khi augment
 
 
-def save_vit5(split_name, data):
-    path = os.path.join(OUT_DIR, f"vit5_{split_name}.csv")
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["review_id", "input_text", "target_text"])
-        w.writeheader()
-        for item in data:
-            w.writerow({
-                "review_id":   item["review_id"],
-                "input_text":  item["text"],
-                "target_text": quads_to_vit5(item["quadruples"]),
-            })
-    print(f"  💾 vit5_{split_name}.csv  ({len(data)} rows)")
+# ══════════════════════════════════════════════════════════════════════════
+# 1. LOAD DATA
+# ══════════════════════════════════════════════════════════════════════════
+def load_jsonl(path: str) -> List[dict]:
+    data = []
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    data.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    print(f'[LOAD] {len(data):,} reviews từ {path}')
+    return data
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# 4. ĐỊNH DẠNG PhoBERT
-# ════════════════════════════════════════════════════════════════════════════
-
-def save_phobert(split_name, data):
-    path    = os.path.join(OUT_DIR, f"phobert_{split_name}.csv")
-    missing = 0
-    fields  = [
-        "review_id", "text",
-        "aspect_term",  "aspect_start",  "aspect_end",
-        "opinion_term", "opinion_start", "opinion_end",
-        "aspect_category", "sentiment",
-    ]
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
-        w.writeheader()
-        for item in data:
-            text = item["text"]
-            for q in item["quadruples"]:
-                a_s = text.lower().find(q["aspect_term"].lower())
-                o_s = text.lower().find(q["opinion_term"].lower())
-                if a_s == -1 or o_s == -1:
-                    missing += 1
-                w.writerow({
-                    "review_id":       item["review_id"],
-                    "text":            text,
-                    "aspect_term":     q["aspect_term"],
-                    "aspect_start":    a_s,
-                    "aspect_end":      a_s + len(q["aspect_term"])  if a_s != -1 else -1,
-                    "opinion_term":    q["opinion_term"],
-                    "opinion_start":   o_s,
-                    "opinion_end":     o_s + len(q["opinion_term"]) if o_s != -1 else -1,
-                    "aspect_category": q["aspect_category"],
-                    "sentiment":       q["sentiment"],
-                })
-    print(f"  💾 phobert_{split_name}.csv  ({len(data)} reviews"
-          + (f", {missing} term không tìm được vị trí" if missing else "") + ")")
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# 5. ĐỊNH DẠNG BiLSTM
-# ════════════════════════════════════════════════════════════════════════════
-
-def bio_tag(tokens, term):
-    term_toks = term.strip().split()
-    n         = len(term_toks)
-    labels    = [None] * len(tokens)
-    for i in range(len(tokens) - n + 1):
-        if [t.lower() for t in tokens[i:i+n]] == [t.lower() for t in term_toks]:
-            labels[i] = "B"
-            for j in range(1, n):
-                labels[i+j] = "I"
-    return labels
-
-
-def quads_to_bio(text, quadruples):
-    tokens  = text.strip().split()
-    if not tokens:
-        return []
-    asp_lbl = ["O"] * len(tokens)
-    opn_lbl = ["O"] * len(tokens)
-    sent_lbl = quadruples[0]["sentiment"]       if quadruples else "neutral"
-    cat_lbl  = quadruples[0]["aspect_category"] if quadruples else "GENERAL"
-
+# ══════════════════════════════════════════════════════════════════════════
+# 2. XÂY DỰNG LABEL VECTOR
+# ══════════════════════════════════════════════════════════════════════════
+def build_label_vector(quadruples: List[dict]) -> List[int]:
+    """
+    Chuyển quadruples → vector 17 chiều.
+    Nếu 1 category xuất hiện nhiều lần với sentiment khác nhau,
+    ưu tiên theo độ nghiêm trọng: negative > neutral > positive.
+    """
+    PRIORITY = {'negative': 3, 'neutral': 2, 'positive': 1, 'none': 0}
+    vec = [0] * NUM_CATS
     for q in quadruples:
-        for i, l in enumerate(bio_tag(tokens, q["aspect_term"])):
-            if l == "B":                asp_lbl[i] = "B-ASP"
-            elif l == "I" and asp_lbl[i] == "O": asp_lbl[i] = "I-ASP"
-        for i, l in enumerate(bio_tag(tokens, q["opinion_term"])):
-            if l == "B":                opn_lbl[i] = "B-OPN"
-            elif l == "I" and opn_lbl[i] == "O": opn_lbl[i] = "I-OPN"
+        cat  = q.get('aspect_category', '').strip()
+        sent = q.get('sentiment', 'positive').lower().strip()
+        if cat not in CAT2IDX:
+            continue
+        idx = CAT2IDX[cat]
+        cur_priority = PRIORITY.get(IDX2SENT[vec[idx]], 0)
+        new_priority = PRIORITY.get(sent, 0)
+        if new_priority > cur_priority:
+            vec[idx] = SENT2IDX.get(sent, 0)
+    return vec
 
-    return [
-        (tokens[i],
-         asp_lbl[i] if asp_lbl[i] != "O" else opn_lbl[i],
-         sent_lbl, cat_lbl)
-        for i in range(len(tokens))
+
+# ══════════════════════════════════════════════════════════════════════════
+# 3. TOKENIZE ĐƠN GIẢN
+# ══════════════════════════════════════════════════════════════════════════
+def tokenize(text: str) -> List[str]:
+    """
+    Tokenize theo khoảng trắng + tách dấu câu.
+    Hỗ trợ underthesea nếu cài đặt (bật bằng USE_UNDERTHESEA=True).
+    """
+    text = text.lower().strip()
+    text = re.sub(r'([,\.!?;:()\[\]{}"\'])', r' \1 ', text)
+    tokens = text.split()
+    return tokens if tokens else ['<unk>']
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 4. XÂY DỰNG BIO SEQUENCE cho BiLSTM-CRF
+# ══════════════════════════════════════════════════════════════════════════
+def find_span_in_tokens(tokens: List[str], term: str) -> Tuple[int, int]:
+    """Tìm vị trí bắt đầu/kết thúc của term trong tokens."""
+    term_toks = tokenize(term)
+    n = len(term_toks)
+    if n == 0:
+        return -1, -1
+    for i in range(len(tokens) - n + 1):
+        if tokens[i:i+n] == term_toks:
+            return i, i + n
+    return -1, -1
+
+
+def build_bio_sequence(tokens: List[str], quadruples: List[dict]) -> List[str]:
+    """Xây dựng BIO tags cho aspect terms trong câu."""
+    bio = ['O'] * len(tokens)
+    tagged = set()  # tránh overlap
+    for q in quadruples:
+        term = q.get('aspect_term', '').strip()
+        sent = q.get('sentiment', 'positive').lower().strip()
+        if not term or sent not in ('positive', 'neutral', 'negative'):
+            continue
+        start, end = find_span_in_tokens(tokens, term)
+        if start == -1:
+            continue
+        # Bỏ qua nếu span đã được tag
+        if any(j in tagged for j in range(start, end)):
+            continue
+        bio[start] = f'B-{sent}'
+        for j in range(start + 1, end):
+            bio[j] = f'I-{sent}'
+        tagged.update(range(start, end))
+    return bio
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 5. AUGMENTATION (word dropout)
+# ══════════════════════════════════════════════════════════════════════════
+def word_dropout(text: str, rate: float = WORD_DROPOUT_RATE) -> str:
+    """Randomly drop một số từ trong text để tạo augmented sample."""
+    tokens = text.split()
+    if len(tokens) <= 4:
+        return text  # quá ngắn, không dropout
+    kept = [t for t in tokens if random.random() > rate]
+    if len(kept) < 3:
+        return text
+    return ' '.join(kept)
+
+
+def word_swap(text: str) -> str:
+    """Hoán vị ngẫu nhiên 1-2 cặp từ liền kề."""
+    tokens = text.split()
+    if len(tokens) < 4:
+        return text
+    n_swaps = max(1, len(tokens) // 20)
+    for _ in range(n_swaps):
+        i = random.randint(0, len(tokens) - 2)
+        tokens[i], tokens[i+1] = tokens[i+1], tokens[i]
+    return ' '.join(tokens)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 6. OVERSAMPLING MINORITY CLASSES
+# ══════════════════════════════════════════════════════════════════════════
+def oversample_minority(samples: List[dict]) -> List[dict]:
+    """
+    Duplicate samples chứa neutral/negative với word augmentation.
+    Không dùng class weights — dùng oversampling thay thế.
+    """
+    aug_samples = list(samples)
+
+    neutral_samples  = [s for s in samples if 2 in s['labels']]
+    negative_samples = [s for s in samples if 3 in s['labels']]
+
+    print(f'  Neutral samples:  {len(neutral_samples):,}')
+    print(f'  Negative samples: {len(negative_samples):,}')
+    print(f'  Positive samples: {len(samples) - len(neutral_samples):,} (ước tính)')
+
+    # Oversample NEUTRAL: x6 (lớp thiểu số nhất)
+    augment_fns = [
+        lambda t: word_dropout(t, rate=0.10),
+        lambda t: word_dropout(t, rate=0.08),
+        lambda t: word_swap(t),
+        lambda t: word_dropout(word_swap(t), rate=0.06),
+        lambda t: word_dropout(t, rate=0.12),
     ]
+    for rep_idx in range(NEUTRAL_OVERSAMPLE - 1):
+        fn = augment_fns[rep_idx % len(augment_fns)]
+        for s in neutral_samples:
+            aug = copy.deepcopy(s)
+            aug['text'] = fn(s['text'])
+            aug['is_augmented'] = True
+            aug_samples.append(aug)
+
+    # Oversample NEGATIVE: x2
+    for s in negative_samples:
+        aug = copy.deepcopy(s)
+        aug['text'] = word_dropout(s['text'], rate=0.08)
+        aug['is_augmented'] = True
+        aug_samples.append(aug)
+
+    random.shuffle(aug_samples)
+    print(f'  Sau oversampling: {len(aug_samples):,} samples')
+    return aug_samples
 
 
-def save_bilstm(split_name, data):
-    path  = os.path.join(OUT_DIR, f"bilstm_{split_name}.txt")
-    n_tok = 0
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("token\tbio_label\tsentiment\tcategory\n")
-        for item in data:
-            rows = quads_to_bio(item["text"], item["quadruples"])
-            if not rows:
-                continue
-            for tok, bio, sent, cat in rows:
-                f.write(f"{tok}\t{bio}\t{sent}\t{cat}\n")
-                n_tok += 1
-            f.write("\n")
-    print(f"  💾 bilstm_{split_name}.txt  ({len(data)} reviews, {n_tok} tokens)")
+# ══════════════════════════════════════════════════════════════════════════
+# 7. XÂY DỰNG TỪ ĐIỂN cho BiLSTM
+# ══════════════════════════════════════════════════════════════════════════
+def build_vocab(samples: List[dict], min_freq: int = 2,
+                max_size: int = 40000) -> Dict[str, int]:
+    """Xây dựng từ điển từ tập training."""
+    counter = Counter()
+    for s in samples:
+        counter.update(tokenize(s['text']))
+    vocab = {'<PAD>': 0, '<UNK>': 1}
+    for word, freq in counter.most_common(max_size):
+        if freq >= min_freq:
+            vocab[word] = len(vocab)
+    print(f'  Kích thước từ điển: {len(vocab):,} từ')
+    return vocab
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# 6. THỐNG KÊ
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════
+# 8. PHÂN TÁCH DỮ LIỆU (stratified)
+# ══════════════════════════════════════════════════════════════════════════
+def stratified_split(data: List[dict]) -> Tuple[List, List, List]:
+    """
+    Phân tách train/val/test theo phân bố category.
+    Stratify bằng combination của categories hiện diện.
+    """
+    def get_strat_key(s):
+        present_cats = sorted([i for i, l in enumerate(s['labels']) if l != 0])
+        if not present_cats:
+            return 'empty'
+        # Dùng 2 cat đầu để stratify
+        key = '_'.join(map(str, present_cats[:2]))
+        return key
 
-def print_stats(data, name=""):
-    sents   = Counter(q["sentiment"]       for i in data for q in i["quadruples"])
-    cats    = Counter(q["aspect_category"] for i in data for q in i["quadruples"])
-    total_q = sum(sents.values())
+    strat_keys   = [get_strat_key(d) for d in data]
+    key_counts   = Counter(strat_keys)
+    final_keys   = [k if key_counts[k] >= 4 else 'other' for k in strat_keys]
 
-    print(f"\n{'='*52}")
-    print(f"📊 SENTIMENT DISTRIBUTION ({name.upper()})")
-    print(f"{'='*52}")
-    for s, c in sorted(sents.items(), key=lambda x: -x[1]):
-        bar = "█" * int(c / total_q * 30)
-        print(f"  {s:<12}: {c:>6} ({c/total_q*100:5.2f}%)  {bar}")
-    print(f"\n  📌 Tổng quadruples: {total_q} | Reviews: {len(data)}")
+    indices      = list(range(len(data)))
+    train_idx, temp_idx = train_test_split(
+        indices,
+        test_size=(VAL_RATIO + TEST_RATIO),
+        stratify=final_keys,
+        random_state=SEED
+    )
 
-    print(f"\n  Top 10 categories:")
-    for cat, cnt in cats.most_common(10):
-        print(f"    {cat:<35} {cnt:>5}")
+    temp_keys    = [final_keys[i] for i in temp_idx]
+    temp_counts  = Counter(temp_keys)
+    temp_final   = [k if temp_counts[k] >= 2 else 'other' for k in temp_keys]
+
+    val_idx, test_idx = train_test_split(
+        temp_idx,
+        test_size=0.50,
+        stratify=temp_final,
+        random_state=SEED
+    )
+
+    return ([data[i] for i in train_idx],
+            [data[i] for i in val_idx],
+            [data[i] for i in test_idx])
 
 
-# ════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════
+# 9. EXPORT FORMATS
+# ══════════════════════════════════════════════════════════════════════════
+def export_bilstm(samples: List[dict], path: str):
+    """
+    BIO format:
+        # labels: l0 l1 ... l16
+        token1 \\t bio_tag1
+        token2 \\t bio_tag2
+        ...
+        <blank line>
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        for s in samples:
+            tokens    = tokenize(s['text'])
+            bio_tags  = build_bio_sequence(tokens, s.get('quadruples', []))
+            label_str = ' '.join(map(str, s['labels']))
+            f.write(f'# labels: {label_str}\n')
+            for tok, tag in zip(tokens, bio_tags):
+                f.write(f'{tok}\t{tag}\n')
+            f.write('\n')
+    print(f'  BiLSTM → {path} ({len(samples):,} samples)')
+
+
+def export_phobert(samples: List[dict], path: str):
+    """CSV: text, label_0, ..., label_16"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    headers = ['text'] + [f'label_{i}' for i in range(NUM_CATS)]
+    with open(path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow(headers)
+        for s in samples:
+            writer.writerow([s['text']] + s['labels'])
+    print(f'  PhoBERT → {path} ({len(samples):,} samples)')
+
+
+def export_vit5(samples: List[dict], path: str):
+    """
+    CSV: text, target
+    target: "toc-do-giao-hang:tot | chat-luong-san-pham:te"
+    hoac "none" neu khong co aspect nao
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow(['text', 'target'])
+        for s in samples:
+            parts = []
+            for i, lbl in enumerate(s['labels']):
+                if lbl != 0:
+                    cat_code = VIT5_CATEGORIES_VN[IDX2CAT[i]]
+                    sent_vn  = SENT2VIT5[IDX2SENT[lbl]]
+                    parts.append(f'{cat_code}:{sent_vn}')
+            target = ' | '.join(parts) if parts else 'none'
+            writer.writerow([s['text'], target])
+    print(f'  ViT5 → {path} ({len(samples):,} samples)')
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 10. BÁO CÁO THỐNG KÊ
+# ══════════════════════════════════════════════════════════════════════════
+def print_split_stats(name: str, samples: List[dict]):
+    cat_counts  = Counter()
+    sent_counts = Counter()
+    multi_aspect = 0
+    for s in samples:
+        n_aspects = sum(1 for l in s['labels'] if l != 0)
+        if n_aspects > 1:
+            multi_aspect += 1
+        for i, lbl in enumerate(s['labels']):
+            if lbl != 0:
+                cat_counts[IDX2CAT[i]] += 1
+                sent_counts[IDX2SENT[lbl]] += 1
+    print(f'\n  [{name}] {len(samples):,} samples | '
+          f'multi-aspect: {multi_aspect:,} ({multi_aspect/max(len(samples),1)*100:.1f}%)')
+    print(f'  Sentiment: {dict(sent_counts)}')
+    print(f'  Top-5 categories: {dict(cat_counts.most_common(5))}')
+
+
+def write_report(train, val, test, path: str):
+    lines = ['=== DATA SPLIT REPORT ===\n']
+
+    def section(name, samples):
+        lines.append(f'\n[{name}] {len(samples):,} samples')
+        cat_c = Counter()
+        sent_c = Counter()
+        for s in samples:
+            for i, l in enumerate(s['labels']):
+                if l != 0:
+                    cat_c[IDX2CAT[i]] += 1
+                    sent_c[IDX2SENT[l]] += 1
+        lines.append(f'  Sentiment: {dict(sent_c)}')
+        lines.append('  Categories:')
+        for cat, cnt in cat_c.most_common():
+            lines.append(f'    {cat}: {cnt}')
+
+    section('TRAIN (after oversample)', train)
+    section('VAL', val)
+    section('TEST', test)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    print(f'\n  Report → {path}')
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # MAIN
-# ════════════════════════════════════════════════════════════════════════════
-
+# ══════════════════════════════════════════════════════════════════════════
 def main():
-    print("=" * 60)
-    print("CHUẨN BỊ DỮ LIỆU ASQP + TÍNH CLASS WEIGHTS")
-    print("=" * 60)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # 1. Đọc & thống kê
-    data = load_jsonl(JSONL_PATH)
-    print_stats(data, "toàn bộ")
+    print('\n' + '='*60)
+    print('  CHUẨN BỊ DỮ LIỆU ABSA — TIKI Baby Products')
+    print('='*60)
 
-    # 2. Chia split
-    train, val, test = split_data(data)
+    # 1. Load
+    print('\n[1] Đọc dữ liệu annotation...')
+    raw = load_jsonl(INPUT_FILE)
 
-    # 3. Thu thập labels từ TOÀN BỘ dữ liệu
-    all_categories = sorted({
-        q["aspect_category"]
-        for item in data
-        for q in item["quadruples"]
-    })
-    all_sentiments = ["positive", "negative", "neutral"]
+    # 2. Convert thành structured samples
+    print('\n[2] Xây dựng label vectors...')
+    samples = []
+    skipped = 0
+    for d in raw:
+        text = d.get('text', '').strip()
+        if len(text) < 3:
+            skipped += 1
+            continue
+        samples.append({
+            'review_id':    d.get('review_id', ''),
+            'text':         text,
+            'labels':       build_label_vector(d.get('quadruples', [])),
+            'quadruples':   d.get('quadruples', []),
+            'is_augmented': False,
+        })
+    print(f'  Hợp lệ: {len(samples):,} | Bỏ qua: {skipped}')
 
-    # 4. ── TÍNH CLASS WEIGHTS TỪ TẬP TRAIN ──────────────────────────────────
-    print(f"\n{'='*52}")
-    print("⚖️  TÍNH CLASS WEIGHTS (chỉ từ tập TRAIN)")
-    print(f"{'='*52}")
+    # Thống kê ban đầu
+    all_sent = Counter()
+    for s in samples:
+        for lbl in s['labels']:
+            if lbl != 0:
+                all_sent[IDX2SENT[lbl]] += 1
+    print(f'  Phân bố sentiment: {dict(all_sent)}')
 
-    sent_weights, sent_counts = compute_class_weights(
-        train, "sentiment", all_sentiments
-    )
-    print_weight_table(sent_weights, sent_counts, "Sentiment weights")
+    # 3. Phân tách TRƯỚC khi oversample (tránh data leakage)
+    print('\n[3] Phân tách train/val/test (stratified)...')
+    train, val, test = stratified_split(samples)
+    print(f'  Train: {len(train):,} | Val: {len(val):,} | Test: {len(test):,}')
 
-    cat_weights, cat_counts = compute_class_weights(
-        train, "aspect_category", all_categories
-    )
-    print_weight_table(cat_weights, cat_counts, "Category weights")
+    print_split_stats('TRAIN (gốc)', train)
+    print_split_stats('VAL', val)
+    print_split_stats('TEST', test)
 
-    # 5. Lưu label_map.json (gồm cả weights)
+    # 4. Oversample CHỈ trên train
+    print('\n[4] Oversampling tập TRAIN...')
+    train_aug = oversample_minority(train)
+
+    # 5. Build vocab từ train (augmented)
+    print('\n[5] Xây dựng từ điển cho BiLSTM...')
+    vocab = build_vocab(train_aug)
+
+    # 6. Export BiLSTM
+    print('\n[6] Xuất BiLSTM format...')
+    export_bilstm(train_aug, f'{OUTPUT_DIR}/bilstm_train.txt')
+    export_bilstm(val,       f'{OUTPUT_DIR}/bilstm_val.txt')
+    export_bilstm(test,      f'{OUTPUT_DIR}/bilstm_test.txt')
+
+    # 7. Export PhoBERT
+    print('\n[7] Xuất PhoBERT format...')
+    export_phobert(train_aug, f'{OUTPUT_DIR}/phobert_train.csv')
+    export_phobert(val,       f'{OUTPUT_DIR}/phobert_val.csv')
+    export_phobert(test,      f'{OUTPUT_DIR}/phobert_test.csv')
+
+    # 8. Export ViT5
+    print('\n[8] Xuất ViT5 format...')
+    export_vit5(train_aug, f'{OUTPUT_DIR}/vit5_train.csv')
+    export_vit5(val,       f'{OUTPUT_DIR}/vit5_val.csv')
+    export_vit5(test,      f'{OUTPUT_DIR}/vit5_test.csv')
+
+    # 9. Lưu metadata
+    print('\n[9] Lưu metadata...')
     label_map = {
-        "aspect_categories": all_categories,
-        "sentiments":        all_sentiments,
-        "bio_labels":        ["O", "B-ASP", "I-ASP", "B-OPN", "I-OPN"],
-        # sent_weights_list[i] = weight của sentiments[i]
-        "sent_weights_list": [sent_weights[s] for s in all_sentiments],
-        # cat_weights_list[i]  = weight của aspect_categories[i]
-        "cat_weights_list":  [cat_weights[c]  for c in all_categories],
+        'categories':       CATEGORIES,
+        'cat2idx':          CAT2IDX,
+        'idx2cat':          IDX2CAT,
+        'sentiments':       IDX2SENT,
+        'sent2idx':         SENT2IDX,
+        'bio_tags':         BIO_TAGS,
+        'bio2idx':          BIO2IDX,
+        'vit5_sent_map':    SENT2VIT5,
+        'vit5_categories':  VIT5_CATEGORIES_VN,
+        'num_categories':   NUM_CATS,
     }
-    with open(os.path.join(OUT_DIR, "label_map.json"), "w", encoding="utf-8") as f:
+    with open(f'{OUTPUT_DIR}/label_map.json', 'w', encoding='utf-8') as f:
         json.dump(label_map, f, ensure_ascii=False, indent=2)
 
-    print(f"\n  📋 Sentiment weights đã lưu vào label_map.json:")
-    for i, s in enumerate(all_sentiments):
-        print(f"     [{i}] {s:<12} → {label_map['sent_weights_list'][i]:.4f}")
+    with open(f'{OUTPUT_DIR}/vocab.json', 'w', encoding='utf-8') as f:
+        json.dump(vocab, f, ensure_ascii=False, indent=2)
 
-    # 6. Lưu file dữ liệu
-    print(f"\n{'='*52}")
-    print("💾 LƯU FILE DỮ LIỆU")
-    print(f"{'='*52}")
+    # 10. Báo cáo
+    print('\n[10] Viết báo cáo thống kê...')
+    write_report(train_aug, val, test, f'{OUTPUT_DIR}/report_split_data.txt')
 
-    print("\n🔧 ViT5:")
-    for name, split in [("train", train), ("val", val), ("test", test)]:
-        save_vit5(name, split)
-
-    print("\n🔧 PhoBERT:")
-    for name, split in [("train", train), ("val", val), ("test", test)]:
-        save_phobert(name, split)
-
-    print("\n🔧 BiLSTM:")
-    for name, split in [("train", train), ("val", val), ("test", test)]:
-        save_bilstm(name, split)
-
-    print(f"\n{'='*60}")
-    print(f"✅ Hoàn tất! Tất cả file lưu tại: {OUT_DIR}/")
-    print(f"   label_map.json  — labels + class weights")
-    print(f"   phobert_*.csv   — dùng cho train_phobert.py")
-    print(f"   vit5_*.csv      — dùng cho train_vit5.py")
-    print(f"   bilstm_*.txt    — dùng cho train_bilstm.py")
-    print(f"{'='*60}")
+    print('\n' + '='*60)
+    print('  HOÀN THÀNH! Dữ liệu đã sẵn sàng tại data/training/')
+    print('='*60)
+    print('\nBước tiếp theo:')
+    print('  python src/training/train_bilstm.py')
+    print('  python src/training/train_phobert.py')
+    print('  python src/training/train_vit5.py')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

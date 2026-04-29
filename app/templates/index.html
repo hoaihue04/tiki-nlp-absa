@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiki Insight — ABSA Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ── HERO ─────────────────────────────────────────────────────── -->
+  <header class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-badge">PhoBERT · Hybrid Recommender </div>
+      <h1>Tiki<em>Insight</em></h1>
+      <p class="hero-sub">Phân tích cảm xúc sản phẩm sơ sinh thông minh</p>
+
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="product-url" type="text"
+               placeholder="Dán link sản phẩm tiki.vn vào đây..."
+               autocomplete="off" spellcheck="false" />
+        <button id="analyze-btn">
+          <span class="btn-text">Phân tích</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </div>
+      <p class="hint">Ví dụ: https://tiki.vn/khan-uot-em-be-bobby-p123456.html</p>
+    </div>
+  </header>
+
+  <!-- ── LOADING ───────────────────────────────────────────────────── -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-card">
+      <div class="progress-ring">
+        <svg viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="34"/>
+          <circle class="ring-fill" id="ring-circle" cx="40" cy="40" r="34"/>
+        </svg>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="loading-text">
+        <strong id="loading-step">Đang khởi động...</strong>
+        <p id="loading-sub">PhoBERT đang được nạp vào bộ nhớ</p>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAIN RESULT ───────────────────────────────────────────────── -->
+  <main id="result-root" class="container hidden">
+
+    <!-- Product card -->
+    <section class="product-hero">
+      <div class="product-img-col">
+        <div class="product-image-wrap" id="product-img-wrap">
+          <span class="product-image-placeholder">🛍️</span>
+        </div>
+        <div id="product-gallery-wrap"></div>
+      </div>
+      <div class="product-hero-left">
+        <div class="product-badge" id="advice-badge">—</div>
+        <h2 id="product-name">—</h2>
+        <div id="product-meta" class="product-meta">—</div>
+        <div id="product-short-desc" class="product-short-desc" style="display:none"></div>
+      </div>
+      <div class="product-hero-right" id="product-scores">
+        <!-- injected by JS -->
+      </div>
+    </section>
+<!-- Thêm sau phần product-hero -->
+    <section class="recommendation-banner" id="rec-banner" style="display: none;">
+      <div class="rec-badge">
+        <span class="rec-icon">🏆</span>
+        <span class="rec-text">KHUYẾN NGHỊ</span>
+      </div>
+      <div class="rec-message" id="rec-message"></div>
+      <div class="rec-score" id="rec-score"></div>
+    </section>    
+
+    <!-- Metric row -->
+    <section class="metrics-strip" id="metrics-grid"></section>
+
+    <!-- Charts -->
+    <section class="charts-row">
+      <article class="panel chart-panel">
+        <h3 class="panel-title">Phân phối cảm xúc theo khía cạnh</h3>
+        <div class="chart-wrap">
+          <canvas id="aspectStackedChart"></canvas>
+        </div>
+      </article>
+      <article class="panel chart-panel chart-panel--narrow">
+        <h3 class="panel-title">📊 Radar so sánh với sản phẩm gợi ý #1</h3>
+        <div class="chart-wrap">
+          <canvas id="aspectRadarChart"></canvas>
+        </div>
+        <div class="chart-legend-note">
+          <span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px">
+            <span style="display:inline-block;width:20px;height:2px;background:#2563eb;border-radius:2px"></span>
+            <span style="font-size:11px">Sản phẩm hiện tại</span>
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:20px;height:2px;background:#f59e0b;border-radius:2px;background-image:repeating-linear-gradient(90deg,#f59e0b,#f59e0b 4px,transparent 4px,transparent 8px)"></span>
+            <span style="font-size:11px">Sản phẩm gợi ý #1</span>
+          </span>
+        </div>
+        <p style="font-size:10px;color:var(--text-3);text-align:center;margin-top:8px;margin-bottom:0">
+          ⚡ Điểm số được chuẩn hóa từ 0-1 (0=tiêu cực, 0.5=trung tính, 1=tích cực)
+        </p>
+      </article>
+    </section>
+
+    <!-- Strengths / Weaknesses -->
+    <section class="panel sw-panel">
+      <div class="sw-col sw-col--green">
+        <div class="sw-header">
+          <span class="sw-dot"></span>
+          <h3>Điểm mạnh nổi bật</h3>
+        </div>
+        <ul id="strength-list" class="sw-list"></ul>
+      </div>
+      <div class="sw-col sw-col--red">
+        <div class="sw-header">
+          <span class="sw-dot"></span>
+          <h3>Điểm yếu cần cải thiện</h3>
+        </div>
+        <ul id="weakness-list" class="sw-list"></ul>
+      </div>
+    </section>
+
+    <!-- Opinion Mining table -->
+    <section class="panel">
+      <h3 class="panel-title">🔍 Opinion Mining — Trích xuất ý kiến chi tiết</h3>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:16px;margin-top:-12px">
+        Phân tích cảm xúc theo từng khía cạnh sản phẩm từ đánh giá của khách hàng
+      </p>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nhóm khía cạnh<br><span style="font-weight:normal">(Tên gốc)</span></th>
+              <th>Ý nghĩa</th>
+              <th>Cảm Xúc</th>
+              <th>Độ Tin Cậy</th>
+              <th>Lượt</th>
+            </tr>
+          </thead>
+          <tbody id="opinion-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Representative Reviews -->
+    <section class="panel">
+      <h3 class="panel-title">⭐ 3 đánh giá tiêu biểu</h3>
+      <div id="review-cards" class="review-grid"></div>
+    </section>
+
+    <!-- Recommendations -->
+    <section class="panel">
+      <div class="rec-header">
+        <h3 class="panel-title">🎯 Top 5 sản phẩm được gợi ý</h3>
+        <span id="rec-weights" class="rec-weights"></span>
+      </div>
+      <div id="recommend-grid" class="rec-grid"></div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

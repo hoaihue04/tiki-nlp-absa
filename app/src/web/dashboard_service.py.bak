@@ -1,0 +1,623 @@
+#!/usr/bin/env python3
+"""
+DashboardService — Logic layer giữa FastAPI và PhoBERT/Hybrid Recommender.
+Trả về payload đầy đủ mà frontend (app.js) cần render.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import pandas as pd
+import requests
+
+# ─── Path fix: đảm bảo ROOT_DIR (TIKI/) trong sys.path ──────────────────────
+_THIS_FILE = Path(__file__).resolve()
+_APP_SRC = _THIS_FILE.parent  # → TIKI/app/src/web/
+_APP_DIR = _APP_SRC.parent.parent  # → TIKI/app/
+_ROOT_DIR = _APP_DIR.parent  # → TIKI/
+
+# Đặt ROOT_DIR lên đầu sys.path để import từ TIKI/src/
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
+
+# Import từ TIKI/src/
+from src.recommendation.hybrid_recommender import (
+    CATEGORIES,
+    HybridABSACBFRecommender,
+    HybridConfig,
+    PhoBERTABSAPredictor,
+    SENTIMENT_TO_SCORE,
+    compute_dynamic_alpha_beta,
+    extract_product_id_from_url,
+    split_sentences,
+)
+from src.recommendation.opinion_rules import extract_opinion_target
+
+# ─── Types ───────────────────────────────────────────────────────────────────
+ProgressCallback = Callable[[int, str], None]
+
+
+# ─── Config ──────────────────────────────────────────────────────────────────
+@dataclass
+class DashboardConfig:
+    max_reviews_for_dashboard: int = 200
+    recommendation_top_k: int = 10
+    candidate_pool: int = 100
+    phobert_batch_size: int = 32
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+def _sentiment_label_from_score(score: float) -> str:
+    if score > 0.15:
+        return "positive"
+    if score < -0.15:
+        return "negative"
+    return "neutral"
+
+
+def _advice_from_score(score: float) -> Dict[str, str]:
+    """Trả về label + tone CSS class cho badge trên Product Hero."""
+    if score >= 0.6:
+        return {"label": "Nên mua", "tone": "positive"}
+    if score >= 0.3:
+        return {"label": "Cân nhắc", "tone": "neutral"}
+    return {"label": "Thận trọng", "tone": "negative"}
+
+
+# ─── Tiki API helper ─────────────────────────────────────────────────────────
+_TIKI_API_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "vi,en;q=0.9",
+    "Referer": "https://tiki.vn/",
+    "x-guest-token": "",
+}
+
+_tiki_cache: Dict[str, Dict] = {}   # in-memory cache theo product_id
+
+
+def fetch_tiki_product_info(product_id: str) -> Dict[str, Any]:
+    """
+    Gọi Tiki public API lấy metadata sản phẩm (ảnh, giá, brand, sold…).
+    Không cần auth token. Cache in-memory để tránh gọi lại.
+    """
+    if product_id in _tiki_cache:
+        return _tiki_cache[product_id]
+
+    result: Dict[str, Any] = {}
+    try:
+        url = f"https://tiki.vn/api/v2/products/{product_id}"
+        resp = requests.get(url, headers=_TIKI_API_HEADERS, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            # Lấy thumbnail từ nhiều field có thể có
+            thumbnail = (
+                data.get("thumbnail_url")
+                or data.get("images", [{}])[0].get("base_url", "")
+                if data.get("images") else ""
+            )
+            result = {
+                "thumbnail_url":   thumbnail,
+                "name":            data.get("name", ""),
+                "price":           data.get("price", 0),
+                "original_price":  data.get("original_price", 0),
+                "brand_name":      data.get("brand", {}).get("name", "")
+                                   if isinstance(data.get("brand"), dict)
+                                   else data.get("brand_name", ""),
+                "rating_average":  float(data.get("rating_average", 0)),
+                "sold_quantity":   data.get("quantity_sold", {}).get("value", 0)
+                                   if isinstance(data.get("quantity_sold"), dict)
+                                   else data.get("all_time_quantity_sold", 0),
+                "sold_text":       data.get("quantity_sold", {}).get("text", "")
+                                   if isinstance(data.get("quantity_sold"), dict)
+                                   else "",
+                "product_url":     f"https://tiki.vn/-p{product_id}.html",
+                "images":          [
+                    img.get("base_url", "")
+                    for img in data.get("images", [])[:5]
+                    if img.get("base_url")
+                ],
+            }
+    except Exception as e:
+        print(f"⚠️  Tiki API error for {product_id}: {e}")
+
+    _tiki_cache[product_id] = result
+    return result
+
+
+def fetch_tiki_recommendations_info(product_ids: List[str]) -> Dict[str, Dict]:
+    """
+    Lấy thumbnail + giá cho danh sách product_id cùng lúc.
+    Dùng ThreadPoolExecutor để parallel fetch.
+    """
+    import concurrent.futures as _cf
+    result: Dict[str, Dict] = {}
+    missing = [pid for pid in product_ids if pid not in _tiki_cache]
+
+    def _fetch_one(pid):
+        info = fetch_tiki_product_info(pid)
+        time.sleep(0.05)   # tránh rate limit
+        return pid, info
+
+    if missing:
+        with _cf.ThreadPoolExecutor(max_workers=5) as pool:
+            for pid, info in pool.map(_fetch_one, missing):
+                result[pid] = info
+
+    for pid in product_ids:
+        result.setdefault(pid, _tiki_cache.get(pid, {}))
+    return result
+
+
+# ─── Service ─────────────────────────────────────────────────────────────────
+class DashboardService:
+    def __init__(
+        self,
+        hybrid_config: Optional[HybridConfig] = None,
+        dash_config: Optional[DashboardConfig] = None,
+    ):
+        self.hybrid_config = hybrid_config or HybridConfig()
+        self.dash_config = dash_config or DashboardConfig()
+
+        self._predictor: Optional[PhoBERTABSAPredictor] = None
+        self._recommender: Optional[HybridABSACBFRecommender] = None
+
+    # ── Internal helpers ────────────────────────────────────────────────────
+    def _safe_progress(self, cb: Optional[ProgressCallback], pct: int, msg: str):
+        if cb:
+            try:
+                cb(pct, msg)
+            except Exception:
+                pass
+
+    def _get_recommender(self) -> HybridABSACBFRecommender:
+        if self._recommender is None:
+            if self._predictor is None:
+                self._predictor = PhoBERTABSAPredictor(
+                    max_len=self.hybrid_config.max_len
+                )
+            self._recommender = HybridABSACBFRecommender(
+                self.hybrid_config, self._predictor
+            )
+        return self._recommender
+
+    # ── Batch predict ────────────────────────────────────────────────────────
+    def _batch_predict(
+        self,
+        reviews_df: pd.DataFrame,
+        progress_callback: Optional[ProgressCallback],
+    ) -> Tuple[List[Dict], List[Dict], Dict]:
+        """
+        Trả về:
+          tuples        — list[dict]: mỗi phần tử là một (sentence, aspect, sentiment, confidence...)
+          review_scores — list[dict]: điểm tổng hợp theo review_id
+          sentiment_bucket — {"positive": int, "neutral": int, "negative": int}
+        """
+        recommender = self._get_recommender()
+
+        # Tách câu từ từng review
+        sentence_meta: List[Dict] = []
+        for _, rv in reviews_df.iterrows():
+            rid = str(rv.get("review_id", ""))
+            text = str(rv.get("normalized_text", rv.get("content", "")))
+            weight = float(rv.get("review_weight", 1.0))
+
+            for sent in split_sentences(text):
+                if sent.strip():
+                    sentence_meta.append({
+                        "review_id": rid,
+                        "sentence": sent,
+                        "weight": weight,
+                        "original_text": text,
+                    })
+
+        total = len(sentence_meta)
+        self._safe_progress(progress_callback, 45, f"PhoBERT xử lý {total} câu...")
+
+        bs = self.dash_config.phobert_batch_size
+        batch_results: List[List[Dict]] = []
+
+        for i in range(0, total, bs):
+            batch = sentence_meta[i:i + bs]
+            sentences = [x["sentence"] for x in batch]
+
+            if hasattr(recommender.predictor, "predict_batch"):
+                preds = recommender.predictor.predict_batch(sentences)
+            else:
+                preds = [recommender.predictor.predict_sentence(s) for s in sentences]
+
+            batch_results.extend(preds)
+
+            pct = 45 + int(40 * min(i + bs, total) / max(total, 1))
+            self._safe_progress(progress_callback, pct, f"Đang phân tích câu {min(i+bs, total)}/{total}...")
+
+        # Aggregate theo review_id
+        tuples: List[Dict] = []
+        review_bucket: Dict[str, List[Dict]] = {}
+
+        for meta, preds in zip(sentence_meta, batch_results):
+            rid = meta["review_id"]
+            review_bucket.setdefault(rid, [])
+
+            # preds có thể là list (nhiều aspect) hoặc dict (1 aspect)
+            if isinstance(preds, dict):
+                preds = [preds]
+
+            for p in preds:
+                raw_sentiment = p.get("sentiment", "neutral")
+                score = float(SENTIMENT_TO_SCORE.get(raw_sentiment, 0.0))
+
+                row = {
+                    "review_id": rid,
+                    "sentence": meta["sentence"],
+                    "aspect": p.get("aspect", "PRODUCT#QUALITY"),
+                    "sentiment": raw_sentiment,
+                    "confidence": float(p.get("confidence", 0.5)),
+                    "sentiment_score": score,
+                    "weighted_score": score * float(p.get("confidence", 0.5)) * meta["weight"],
+                }
+                tuples.append(row)
+                review_bucket[rid].append(row)
+
+        review_scores = []
+        sentiment_bucket: Dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
+
+        for rid, items in review_bucket.items():
+            total_w = sum(abs(x["confidence"]) for x in items)
+            total_s = sum(x["weighted_score"] for x in items)
+
+            agg_score = total_s / total_w if total_w else 0.0
+            label = _sentiment_label_from_score(agg_score)
+            sentiment_bucket[label] += 1
+
+            review_scores.append({
+                "review_id": rid,
+                "score": agg_score,
+                "label": label,
+                "confidence": max(x["confidence"] for x in items),
+            })
+
+        return tuples, review_scores, sentiment_bucket
+
+    # ── Build aspect payload ────────────────────────────────────────────────
+    @staticmethod
+    def _build_aspect_payload(tuples_df: pd.DataFrame) -> Dict:
+        """
+        Tổng hợp dữ liệu theo aspect cho charts + strengths/weaknesses.
+        """
+        aspects = tuples_df["aspect"].unique().tolist()
+
+        table = []
+        radar = []
+
+        for asp in aspects:
+            sub = tuples_df[tuples_df["aspect"] == asp]
+            pos = int((sub["sentiment"] == "positive").sum())
+            neu = int((sub["sentiment"] == "neutral").sum())
+            neg = int((sub["sentiment"] == "negative").sum())
+            total = pos + neu + neg
+            avg_score = float(sub["sentiment_score"].mean()) if not sub.empty else 0.0
+            # Normalize score từ [-1,1] sang [0,1] cho radar chart
+            normalized = (avg_score + 1) / 2
+
+            table.append({
+                "aspect": asp,
+                "positive": pos,
+                "neutral": neu,
+                "negative": neg,
+                "mentions": total,
+                "avg_score_0_1": normalized,
+            })
+            radar.append({"aspect": asp, "score": round(normalized, 4)})
+
+        # Sort by mentions desc
+        table.sort(key=lambda x: x["mentions"], reverse=True)
+
+        # Strengths: top 3 avg_score cao nhất
+        sorted_by_score = sorted(table, key=lambda x: x["avg_score_0_1"], reverse=True)
+        strengths = sorted_by_score[:3]
+        weaknesses = sorted(table, key=lambda x: x["avg_score_0_1"])[:3]
+
+        return {
+            "table": table,
+            "radar": radar,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+        }
+
+    # ── Build opinion table ─────────────────────────────────────────────────
+    @staticmethod
+    def _build_opinion_table(tuples_df: pd.DataFrame) -> List[Dict]:
+        """
+        Trích xuất opinion target từ câu, rồi group by (opinion, aspect, sentiment).
+        Gọi đúng signature: extract_opinion_target(sentence, aspect, sentiment, confidence)
+        """
+        rows = []
+        for _, r in tuples_df.iterrows():
+            sentence   = str(r.get("sentence", ""))
+            aspect     = str(r.get("aspect", ""))
+            sentiment  = str(r.get("sentiment", "neutral"))
+            confidence = float(r.get("confidence", 0.5))
+            try:
+                info = extract_opinion_target(sentence, aspect, sentiment, confidence)
+                opinion = info.get("opinion", "") if info else ""
+            except Exception:
+                opinion = ""
+
+            rows.append({
+                "opinion":    opinion,
+                "aspect":     aspect,
+                "sentiment":  sentiment,
+                "confidence": confidence,
+                "sentence":   sentence,
+            })
+
+        if not rows:
+            return []
+
+        df = pd.DataFrame(rows)
+        grp = (
+            df.groupby(["opinion", "aspect", "sentiment"])
+            .agg(
+                count=("confidence", "count"),
+                confidence=("confidence", "mean"),
+                sentence=("sentence", "first"),
+            )
+            .reset_index()
+            .sort_values("count", ascending=False)
+        )
+        # Chỉ lấy các row có opinion thực sự
+        grp = grp[grp["opinion"].str.strip() != ""]
+        return grp.to_dict(orient="records")
+
+    # ── Build representative reviews ────────────────────────────────────────
+    @staticmethod
+    def _representative_reviews(
+        reviews_df: pd.DataFrame,
+        review_scores: List[Dict],
+    ) -> List[Dict]:
+        """Trả về 3 review: tích cực nhất, tiêu cực nhất, ngẫu nhiên trung lập."""
+        score_map = {r["review_id"]: r for r in review_scores}
+
+        # Merge scores vào reviews_df
+        reviews_df = reviews_df.copy()
+        reviews_df["_score"] = reviews_df["review_id"].astype(str).map(
+            lambda rid: score_map.get(rid, {}).get("score", 0.0)
+        )
+        reviews_df["_label"] = reviews_df["review_id"].astype(str).map(
+            lambda rid: score_map.get(rid, {}).get("label", "neutral")
+        )
+
+        text_col = "normalized_text" if "normalized_text" in reviews_df.columns else "content"
+
+        def pick(cond, ascending):
+            sub = reviews_df[cond]
+            if sub.empty:
+                sub = reviews_df
+            row = sub.sort_values("_score", ascending=ascending).iloc[0]
+            rating = None
+            try:
+                rating = int(float(row.get("rating", 0)))
+            except Exception:
+                pass
+            return {
+                "text":   str(row.get(text_col, ""))[:500],
+                "label":  str(row.get("_label", "neutral")),
+                "score":  float(row.get("_score", 0.0)),
+                "rating": rating,
+            }
+
+        best = pick(reviews_df["_label"] == "positive", ascending=False)
+        worst = pick(reviews_df["_label"] == "negative", ascending=True)
+        neutral = pick(reviews_df["_label"] == "neutral", ascending=False)
+
+        return [best, worst, neutral]
+
+    # ── Main entry point ────────────────────────────────────────────────────
+    def analyze_product(
+        self,
+        product_url: Optional[str] = None,
+        product_id: Optional[str] = None,
+        progress_callback: Optional[ProgressCallback] = None,
+    ) -> Dict[str, Any]:
+        """
+        Pipeline đầy đủ. Trả về dict khớp 100% với những gì app.js render.
+        """
+        recommender = self._get_recommender()
+
+        # STEP 1 — Lấy product_id
+        self._safe_progress(progress_callback, 5, "Trích xuất product ID...")
+        if not product_id:
+            if not product_url:
+                raise ValueError("Thiếu product_id hoặc product_url")
+            product_id = extract_product_id_from_url(product_url)
+        if not product_id:
+            raise ValueError("Không extract được product_id từ URL đã cho")
+        product_id = str(product_id)
+
+        # STEP 2 — Load product metadata + fetch Tiki API (ảnh, giá, brand...)
+        self._safe_progress(progress_callback, 10, "Đang tải thông tin sản phẩm...")
+        product_row = recommender._get_product_meta(product_id)
+        pi = product_row if isinstance(product_row, dict) else (
+            product_row.to_dict() if hasattr(product_row, "to_dict") else {}
+        )
+
+        # Gọi Tiki API để lấy thumbnail + giá realtime (non-blocking, timeout=8s)
+        self._safe_progress(progress_callback, 12, "Đang tải hình ảnh sản phẩm từ Tiki...")
+        tiki_info = fetch_tiki_product_info(product_id)
+
+        # STEP 3 — Load & preprocess reviews
+        self._safe_progress(progress_callback, 20, "Đang tải và làm sạch đánh giá...")
+        raw_reviews = recommender.load_reviews(product_id)
+        reviews_df = recommender.preprocess_reviews(raw_reviews)
+
+        if reviews_df.empty:
+            raise ValueError("Không tìm thấy đánh giá nào cho sản phẩm này")
+
+        reviews_df = reviews_df.head(self.dash_config.max_reviews_for_dashboard)
+
+        # Đảm bảo cột review_id tồn tại
+        if "review_id" not in reviews_df.columns:
+            reviews_df = reviews_df.copy()
+            reviews_df["review_id"] = [str(i) for i in range(len(reviews_df))]
+
+        self._safe_progress(progress_callback, 30, "Tiền xử lý văn bản hoàn tất...")
+
+        # STEP 4 — PhoBERT batch inference
+        self._safe_progress(progress_callback, 40, "Đang chạy PhoBERT ABSA...")
+        tuples, review_scores, sentiment_bucket = self._batch_predict(
+            reviews_df, progress_callback
+        )
+
+        tuples_df = pd.DataFrame(tuples)
+        if tuples_df.empty:
+            raise ValueError("PhoBERT không trả về kết quả (tuples rỗng)")
+
+        # STEP 5 — Aspect aggregation
+        self._safe_progress(progress_callback, 86, "Tổng hợp kết quả theo khía cạnh...")
+        aspect_payload = self._build_aspect_payload(tuples_df)
+
+        # STEP 6 — Opinion mining
+        self._safe_progress(progress_callback, 88, "Trích xuất opinion targets...")
+        opinion_table = self._build_opinion_table(tuples_df)
+
+        # STEP 7 — Hybrid recommendation (KHÔNG gọi recommender.run() — tránh tính lại ABSA)
+        self._safe_progress(progress_callback, 90, "Tính hybrid recommendation scores...")
+        try:
+            # Dùng ABSA score đã tính ở STEP 4 thay vì tính lại
+            query_absa_score = absa_score   # đã normalize [0,1]
+
+            # Quality stats để tính dynamic alpha/beta
+            n_reviews = len(reviews_df)
+            n_noisy   = int(reviews_df.get("is_noisy", pd.Series([False]*n_reviews)).sum())
+            noise_ratio_val = n_noisy / max(n_reviews, 1)
+
+            alpha, beta, _, _ = compute_dynamic_alpha_beta(
+                n_reviews=n_reviews,
+                noise_ratio=noise_ratio_val,
+                alpha_min=recommender.cfg.alpha_min,
+                alpha_max=recommender.cfg.alpha_max,
+                n_threshold=recommender.cfg.n_threshold,
+                lambda_noise=recommender.cfg.lambda_noise,
+            )
+
+            # CBF scores dùng pre-computed TF-IDF matrix
+            cbf_candidates = recommender._compute_cbf_scores(product_id)
+            preselect = cbf_candidates.head(
+                min(self.dash_config.recommendation_top_k * 3, 20)
+            ).copy()
+
+            # ABSA scores cho candidates — dùng disk cache (nhanh)
+            pid_list = preselect["product_id"].astype(str).tolist()
+            absa_scores_map = {}
+            for pid in pid_list:
+                absa_scores_map[pid] = recommender._get_absa_cached(pid)
+
+            preselect["absa_score"]   = preselect["product_id"].astype(str).map(absa_scores_map).fillna(0.5)
+            preselect["hybrid_score"] = alpha * preselect["absa_score"] + beta * preselect["cbf_score"]
+            ranked = preselect.sort_values("hybrid_score", ascending=False).reset_index(drop=True)
+            top_k_df = ranked.head(self.dash_config.recommendation_top_k)
+
+            # Fetch ảnh + giá cho top recommendations song song
+            rec_pids = top_k_df["product_id"].astype(str).tolist()
+            rec_info_map = fetch_tiki_recommendations_info(rec_pids)
+
+            top_products = []
+            for _, r in top_k_df.iterrows():
+                pid = str(r.get("product_id", ""))
+                tiki_rec = rec_info_map.get(pid, {})
+                top_products.append({
+                    "product_id":    pid,
+                    "name":          tiki_rec.get("name") or str(r.get("name", "—")),
+                    "hybrid_score":  float(r.get("hybrid_score", 0.0)),
+                    "absa_score":    float(r.get("absa_score", 0.0)),
+                    "cbf_score":     float(r.get("cbf_score", 0.0)),
+                    "thumbnail_url": tiki_rec.get("thumbnail_url", ""),
+                    "price":         tiki_rec.get("price", r.get("price", 0)),
+                    "product_url":   tiki_rec.get("product_url")
+                                     or r.get("product_url")
+                                     or f"https://tiki.vn/-p{pid}.html",
+                })
+
+        except Exception as rec_err:
+            print(f"⚠️  Recommender error: {rec_err}")
+            import traceback; traceback.print_exc()
+            alpha, beta = 0.5, 0.5
+            top_products = []
+
+        # STEP 8 — Build final metrics
+        self._safe_progress(progress_callback, 95, "Xây dựng payload dashboard...")
+
+        total_reviews = len(reviews_df)
+        noise_ratio = float(reviews_df.get("is_noisy", pd.Series([False]*total_reviews)).mean()
+                            if "is_noisy" in reviews_df.columns else 0.0)
+        absa_score_raw = float(tuples_df["sentiment_score"].mean())
+        absa_score = round((absa_score_raw + 1) / 2, 4)
+
+        # Rating trung bình
+        rating_average = (
+            tiki_info.get("rating_average")
+            or float(pi.get("rating_average", pi.get("rating", 0.0)))
+        )
+        if not rating_average and "rating" in reviews_df.columns:
+            try:
+                rating_average = float(reviews_df["rating"].dropna().astype(float).mean())
+            except Exception:
+                rating_average = 0.0
+
+        # Gộp metadata từ CSV + Tiki API (Tiki API ưu tiên hơn)
+        product_info = {
+            "product_id":     product_id,
+            "name":           tiki_info.get("name") or str(pi.get("name", f"Sản phẩm #{product_id}")),
+            "price":          tiki_info.get("price") or pi.get("price", 0),
+            "original_price": tiki_info.get("original_price") or pi.get("original_price", 0),
+            "sold_text":      tiki_info.get("sold_text") or str(pi.get("all_time_quantity_sold", "")),
+            "sold_quantity":  tiki_info.get("sold_quantity") or pi.get("quantity_sold", 0),
+            "brand_name":     tiki_info.get("brand_name") or str(pi.get("brand_name", "")),
+            "thumbnail_url":  tiki_info.get("thumbnail_url", ""),
+            "images":         tiki_info.get("images", []),
+            "product_url":    tiki_info.get("product_url") or f"https://tiki.vn/-p{product_id}.html",
+        }
+
+        advice = _advice_from_score(absa_score)
+        num_aspects = int(tuples_df["aspect"].nunique())
+        total_sent = max(sum(sentiment_bucket.values()), 1)
+
+        metrics = {
+            "rating_average":       round(float(rating_average), 1),
+            "absa_score":           absa_score,
+            "total_reviews_used":   total_reviews,
+            "num_aspects_mentioned":num_aspects,
+            "noise_ratio":          round(noise_ratio, 4),
+            "alpha":                round(float(alpha), 4),
+            "beta":                 round(float(beta), 4),
+            # % sentiment cho metric cards
+            "positive_ratio": round(sentiment_bucket.get("positive", 0) / total_sent, 4),
+            "neutral_ratio":  round(sentiment_bucket.get("neutral",  0) / total_sent, 4),
+            "negative_ratio": round(sentiment_bucket.get("negative", 0) / total_sent, 4),
+        }
+
+        # Representative reviews
+        rep_reviews = self._representative_reviews(reviews_df, review_scores)
+
+        self._safe_progress(progress_callback, 100, "Hoàn thành!")
+
+        return {
+            "product_info": product_info,
+            "advice": advice,
+            "metrics": metrics,
+            "aspect": aspect_payload,
+            "opinion_table": opinion_table,
+            "representative_reviews": rep_reviews,
+            "recommendations": {
+                "alpha": round(float(alpha), 4),
+                "beta": round(float(beta), 4),
+                "top_products": top_products,
+            },
+            "_sentiment_distribution": sentiment_bucket,
+        }

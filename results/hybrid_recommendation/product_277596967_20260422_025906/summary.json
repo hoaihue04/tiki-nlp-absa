@@ -1,0 +1,190 @@
+{
+  "input": {
+    "product_id": "277596967",
+    "product_url": "https://tiki.vn/product-p277596967.html?spid=277596969",
+    "product_name": "Sữa bột Nutifood GrowPLUS+ Suy Dinh Dưỡng (Đỏ) 2+ Lon 850G"
+  },
+  "query_review_quality": {
+    "n_reviews": 7,
+    "noise_ratio": 0.5714285714285714,
+    "n_noisy": 4
+  },
+  "dynamic_weighting": {
+    "alpha": 0.2822857142857143,
+    "beta": 0.7177142857142857,
+    "alpha_case1": 0.52,
+    "alpha_case2_before_clip": 0.2822857142857143,
+    "params": {
+      "alpha_min": 0.1,
+      "alpha_max": 0.7,
+      "n_threshold": 10,
+      "lambda_noise": 0.8
+    }
+  },
+  "query_absa": {
+    "p_absa": 1.0,
+    "p_absa_raw": 1.0,
+    "used_reviews": 7,
+    "used_sentences": 7,
+    "used_tuples": 10,
+    "per_aspect": {
+      "PRODUCT#QUALITY": 1.0,
+      "DELIVERY#SPEED": 0.5,
+      "DELIVERY#PACKAGING": 1.0,
+      "PRICE#AFFORDABILITY": 1.0,
+      "SELLER#SERVICE": 0.5,
+      "PRODUCT#FUNCTION": 0.5,
+      "PRODUCT#COMFORT": 0.5,
+      "PRODUCT#DESIGN": 0.5,
+      "DELIVERY#ACCURACY": 0.5,
+      "PRODUCT#DURABILITY": 0.5,
+      "PRODUCT#SAFETY": 1.0,
+      "SELLER#AUTHENTICITY": 0.5,
+      "PRODUCT#MATERIAL": 0.5,
+      "PRODUCT#SIZE": 0.5,
+      "PRODUCT#VALUE": 0.5,
+      "PRICE#DISCOUNT": 0.5,
+      "SELLER#RESPONSIVENESS": 0.5
+    }
+  },
+  "outputs": {
+    "output_dir": "results\\hybrid_recommendation\\product_277596967_20260422_025906",
+    "ranked_csv": "results\\hybrid_recommendation\\product_277596967_20260422_025906\\ranked_products.csv",
+    "top_k_csv": "results\\hybrid_recommendation\\product_277596967_20260422_025906\\top_k_products.csv",
+    "alpha_beta_chart": "results\\hybrid_recommendation\\product_277596967_20260422_025906\\dynamic_alpha_beta.png",
+    "aspect_radar_chart": "results\\hybrid_recommendation\\product_277596967_20260422_025906\\query_aspect_radar.png",
+    "topk_breakdown_chart": "results\\hybrid_recommendation\\product_277596967_20260422_025906\\topk_breakdown.png"
+  },
+  "top_k_preview": [
+    {
+      "product_id": "277596997",
+      "name": "Sữa Bột GrowPLUS+ Biếng Ăn (Xanh) cho trẻ tăng cân khoẻ mạnh 2+ Lon 1,65KG",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277596997.html?spid=277596998",
+      "cbf_score": 0.7003213902125225,
+      "absa_score": 1.0,
+      "hybrid_score": 0.7849163806325306
+    },
+    {
+      "product_id": "277597569",
+      "name": "Thùng Sữa Bột Pha Sẵn GrowPLUS+ Suy Dinh Dưỡng (Đỏ) - Tăng Cân, Tăng Chiều Cao (48 Hộp x 180ml)",
+      "brand_name": "GrowPlus",
+      "category_id": "10419",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa công thức pha sẵn cho bé",
+      "product_url": "https://tiki.vn/product-p277597569.html?spid=277597575",
+      "cbf_score": 0.6908579714118831,
+      "absa_score": 1.0,
+      "hybrid_score": 0.7781243497676145
+    },
+    {
+      "product_id": "277596979",
+      "name": "Sữa Bột Nutifood GrowPLUS+ Biếng Ăn (Xanh) 2+ Lon 900G - Tăng cân khoẻ mạnh",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277596979.html?spid=277596982",
+      "cbf_score": 0.6827272795681216,
+      "absa_score": 1.0,
+      "hybrid_score": 0.7722888360786062
+    },
+    {
+      "product_id": "277596949",
+      "name": "Sữa bột Nutifood GrowPLUS+ Suy Dinh Dưỡng (Đỏ) 1+ Lon 1,65KG",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277596949.html?spid=277596952",
+      "cbf_score": 0.855610481936328,
+      "absa_score": 0.5,
+      "hybrid_score": 0.7552267230354446
+    },
+    {
+      "product_id": "277596993",
+      "name": "Thùng Sữa bột pha sẵn GrowPLUS+ Biếng ăn (XANH) cho trẻ tăng cân khoẻ mạnh 1+ (48 hộp x 180ml)",
+      "brand_name": "GrowPlus",
+      "category_id": "10419",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa công thức pha sẵn cho bé",
+      "product_url": "https://tiki.vn/product-p277596993.html?spid=277596994",
+      "cbf_score": 0.527525732595554,
+      "absa_score": 1.0,
+      "hybrid_score": 0.6608984686514376
+    },
+    {
+      "product_id": "277596976",
+      "name": "Thùng Sữa bột pha sẵn GrowPLUS+ Biếng ăn (XANH) cho trẻ tăng cân khoẻ mạnh 1+ (48 hộp x 110ml)",
+      "brand_name": "GrowPlus",
+      "category_id": "10419",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa công thức pha sẵn cho bé",
+      "product_url": "https://tiki.vn/product-p277596976.html?spid=277596977",
+      "cbf_score": 0.5274708206188625,
+      "absa_score": 1.0,
+      "hybrid_score": 0.6608590575413094
+    },
+    {
+      "product_id": "277588206",
+      "name": "Sữa Bột Nutifood Sweden GrowPLUS+ Sữa Non Immunel từ 0 - 12 tháng lon 800g",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277588206.html?spid=277588207",
+      "cbf_score": 0.4908555453827117,
+      "absa_score": 1.0,
+      "hybrid_score": 0.6345797514289634
+    },
+    {
+      "product_id": "277596984",
+      "name": "Sữa Bột GrowPLUS+ Biếng Ăn (Xanh) cho trẻ tăng cân khoẻ mạnh 1+ Lon 1,65KG",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277596984.html?spid=277596986",
+      "cbf_score": 0.6821535501689163,
+      "absa_score": 0.5,
+      "hybrid_score": 0.6307342051498052
+    },
+    {
+      "product_id": "278695700",
+      "name": "Thùng SBPS Nutifood GrowPLUS+ ít đường Suy Dinh Dưỡng - Tăng Cân, Tăng Chiều Cao (48 Hộp x 110ml)",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p278695700.html?spid=278695701",
+      "cbf_score": 0.4257315465253452,
+      "absa_score": 1.0,
+      "hybrid_score": 0.5878393271061906
+    },
+    {
+      "product_id": "277596978",
+      "name": "Sữa Bột Nutifood GrowPLUS+ Biếng Ăn 900g trên 1 tuổi - Tăng cân khỏe mạnh",
+      "brand_name": "GrowPlus",
+      "category_id": "2600",
+      "category_lv1": "Mẹ & Bé",
+      "category_lv2": "Dinh dưỡng cho bé",
+      "category_lv3": "Sữa bột cho bé",
+      "product_url": "https://tiki.vn/product-p277596978.html?spid=277596980",
+      "cbf_score": 0.4173358117459209,
+      "absa_score": 1.0,
+      "hybrid_score": 0.5818135883159296
+    }
+  ]
+}

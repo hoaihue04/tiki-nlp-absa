@@ -1,225 +1,120 @@
-# 🍼 Ứng dụng NLP để Phân tích Phản hồi Khách hàng và Xây dựng Hệ thống Đề xuất Sản phẩm Dành cho Trẻ Sơ sinh trên Sàn Thương mại Điện tử Tiki
+# 🍼 TikiInsight — Phân Tích Cảm Xúc & Hệ Thống Đề Xuất Sản Phẩm Sơ Sinh
+
+> **Ứng dụng NLP để phân tích phản hồi khách hàng và xây dựng hệ thống đề xuất sản phẩm dành cho trẻ sơ sinh trên sàn thương mại điện tử Tiki**
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)
+![PhoBERT](https://img.shields.io/badge/Model-PhoBERT-orange)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
 ## 📌 Giới thiệu
 
-Dự án nghiên cứu ứng dụng **Natural Language Processing (NLP)** để phân tích phản hồi (review) của khách hàng trên sàn thương mại điện tử **Tiki**, tập trung vào danh mục **sản phẩm dành cho trẻ sơ sinh** (tã, sữa, đồ chơi, quần áo,...).
+**TikiInsight** là hệ thống phân tích cảm xúc theo khía cạnh (Aspect-Based Sentiment Analysis - ABSA) và đề xuất sản phẩm thông minh, được xây dựng cho ngành hàng mẹ & bé trên nền tảng Tiki.vn.
 
-Bài toán trọng tâm là **Aspect Sentiment Quad Prediction (ASQP)** — phân tích cảm xúc đa khía cạnh theo 4 chiều:
+Hệ thống cho phép người dùng dán link sản phẩm Tiki và nhận ngay:
+- 📊 **Phân tích cảm xúc** theo từng khía cạnh sản phẩm (chất lượng, chất liệu, giá cả, an toàn, giao hàng...)
+- 🎯 **Điểm ABSA tổng hợp** và biểu đồ radar so sánh với sản phẩm cùng phân khúc
+- 💡 **Gợi ý Top-5 sản phẩm** thay thế theo thuật toán Hybrid Recommender
 
-| Thành phần | Ý nghĩa | Ví dụ |
+---
+
+## 🖼️ Demo
+![Demo 0](docs/images/demo0.png)
+| Tổng quan phân tích | Điểm mạnh & điểm yếu | Opinion Mining chi tiết |
 |---|---|---|
-| **Aspect Term** | Cụm từ đề cập khía cạnh | `"chất liệu"` |
-| **Aspect Category** | Nhóm khía cạnh chuẩn hóa | `PRODUCT#MATERIAL` |
-| **Opinion Term** | Cụm từ thể hiện ý kiến | `"tốt"` |
-| **Sentiment** | Cực tính cảm xúc | `positive` |
-
-**Ví dụ:** Review `"chất liệu tốt bé dùng rất thoải mái"` → quadruple: `(chất liệu, PRODUCT#MATERIAL, tốt, positive)`
+| ![Demo 1](docs/images/demo1.png) | ![Demo 2](docs/images/demo2.png) | ![Demo 3](docs/images/demo3.png) |
 
 ---
 
-## 🎯 Mục tiêu
-
-- Thu thập dữ liệu review sản phẩm trẻ sơ sinh từ Tiki bằng crawler
-- Xây dựng pipeline annotation tự động bằng LLaMA để tạo bộ dữ liệu ASQP tiếng Việt
-- Huấn luyện và so sánh 3 mô hình: **BiLSTM-CRF** (baseline), **PhoBERT**, **ViT5**
-- Triển khai web demo
-
----
-
-## 🗂️ Cấu trúc dự án
+## 🏗️ Kiến trúc hệ thống
 
 ```
 TIKI/
 │
-├── data/
-│   ├── raw/                        # Dữ liệu thô từ Tiki (sản phẩm, reviews)
-│   │   ├── Tiki_be_detail.csv
-│   │   ├── Tiki_be_listing.csv
-│   │   ├── Tiki_be_product_id.csv
-│   │   ├── Tiki_be_reviews.csv
-│   │   └── ...
-│   │
-│   ├── interim/                    # Dữ liệu trung gian (đã làm sạch, chuẩn hóa)
-│   │   ├── cleaned_reviews.csv
-│   │   ├── normalized_reviews.csv
-│   │   ├── merged_reviews_products.csv
-│   │   ├── human_labels_exported.json
-│   │   ├── labelstudio_tasks.json
-│   │   └── sampled_ids.json
-│   │
-│   └── processed/                  # Dữ liệu đã annotation, sẵn sàng train
-│       ├── asqp_annotated.jsonl    ← File dữ liệu chính (ASQP quadruples)
-│       ├── asqp_annotated_flat.csv
-│       ├── annotation.log
-│       └── skipped_reviews.jsonl
+├── app/                         # 🌐 Web Demo (FastAPI)
+│   ├── src/                     # Logic xử lý backend
+│   ├── static/                  # CSS, JS, assets
+│   ├── templates/               # HTML templates (Jinja2)
+│   └── app.py                   # Entry point FastAPI
 │
-├── models/                         # Model checkpoints sau khi train
+├── data/                        # 📊 Dữ liệu
+│   ├── raw/                     # Dữ liệu thô từ Tiki
+│   ├── interim/                 # Dữ liệu trung gian
+│   ├── processed/               # Dữ liệu đã xử lý (20,446 reviews)
+│   └── training/                # Tập train/val/test (split 70:15:15)
 │
-├── notebooks/                      # Jupyter notebooks phân tích, EDA
+├── models/                      # 🤖 Các mô hình ML/DL
+│   ├── bilstm/                  # BiLSTM-CRF (sequence labeling)
+│   ├── phobert/                 # PhoBERT fine-tuned (ABSA chính)
+│   ├── recommendation/          # Hybrid Recommender
+│   └── svm/                     # SVM+TF-IDF (baseline)
 │
-├── results/                        # Kết quả đánh giá, bảng so sánh models
+├── src/                         # 🧠 Core pipeline
+│   ├── annotation/              # LLM Annotation (Groq + LLaMA 3.3 70B)
+│   ├── crawling/                # Crawl dữ liệu từ Tiki API
+│   ├── data_labeling/           # Label Studio integration
+│   ├── data_preprocessing/      # Tiền xử lý văn bản tiếng Việt
+│   ├── recommendation/          # Thuật toán gợi ý hybrid
+│   ├── training/                # Training pipeline
+│   └── utils/                   # Hàm tiện ích
 │
-├── src/
-│   ├── crawling/                   # Scripts thu thập dữ liệu từ Tiki
-│   │   ├── 1.Crawl_category_product_id.py
-│   │   ├── 2.Crawl_Product_Detail.py
-│   │   ├── 3.Crawl_products_listing.py
-│   │   └── 4.Crawl_product_reviews.py
-│   │
-│   ├── data_preprocessing/         # Làm sạch và chuẩn hóa dữ liệu
-│   │   ├── clean_data.py
-│   │   └── normalize_text.py
-│   │
-│   ├── annotation/                 # Pipeline annotation tự động bằng LLaMA
-│   │   ├── annotator.py            # Core annotation logic
-│   │   ├── run_annotation.py       # Script chạy annotation
-│   │   ├── config.py
-│   │   ├── constants.py
-│   │   ├── check_api_status.py
-│   │   └── del_NA_review.py
-│   │
-│   ├── data_labeling/              # Đánh giá chất lượng annotation
-│   │   ├── evaluate_human_vs_llm.py
-│   │   └── prepare_data.py
-│   │
-│   ├── training/                   # Train và đánh giá models
-│   │   ├── prepare_data.py         # Tiền xử lý cho training (BIO tagging, seq2seq)
-│   │   ├── train_bilstm.py         # Train BiLSTM-CRF baseline
-│   │   ├── train_phobert.py        # Fine-tune PhoBERT
-│   │   ├── train_vit5.py           # Fine-tune ViT5
-│   │   ├── compare_models.py       # So sánh kết quả 3 models
-│   │   ├── run_all.py              # Chạy toàn bộ pipeline training
-│   │   └── colab_utils.py          # Tiện ích cho Google Colab
-│   │
-│   └── utils/
-│       └── constants.py
-│
-├── .env.example                    # Template biến môi trường 
-├── .gitignore
-├── requirements.txt
-├── README.md
-└── Visualize.pbix                  # Dashboard Power BI
+├── notebooks/                   # Jupyter Notebook (EDA, thử nghiệm)
+├── results/                     # Kết quả output (metrics, predict)
+├── checkpoints/                 # Model checkpoints
+└── requirements.txt
 ```
 
 ---
 
-## 🔄 Quy trình thực hiện
+## 🤖 Các mô hình sử dụng
 
-### Giai đoạn 1 — Thu thập dữ liệu (Crawling)
+### Phân tích cảm xúc theo khía cạnh (ABSA)
 
-```
-Tiki Website
-    │
-    ├─ 1. Lấy danh sách category → product_id
-    ├─ 2. Crawl chi tiết từng sản phẩm
-    ├─ 3. Crawl listing (tên, giá, rating,...)
-    └─ 4. Crawl reviews của từng sản phẩm
-```
-
-**Scripts:** `src/crawling/`  
-**Output:** `data/raw/*.csv`
-
-Dữ liệu thu thập gồm **~XX sản phẩm** và **~XX.000 reviews** thuộc danh mục trẻ sơ sinh trên Tiki.
-
----
-
-### Giai đoạn 2 — Tiền xử lý dữ liệu
-
-- Loại bỏ review rác, spam, trùng lặp
-- Chuẩn hóa văn bản tiếng Việt (lowercase, bỏ ký tự đặc biệt,...)
-- Lọc review quá ngắn (< 5 ký tự) hoặc không có nội dung
-- Gộp thông tin review với thông tin sản phẩm
-
-**Scripts:** `src/data_preprocessing/`  
-**Output:** `data/interim/cleaned_reviews.csv`, `normalized_reviews.csv`
-
----
-
-### Giai đoạn 3 — Annotation tự động bằng LLaMA
-
-Sử dụng **LLaMA** (via API) để tự động gán nhãn ASQP quadruples cho từng review:
-
-```
-Review text
-    │
-    ▼
-LLaMA API (few-shot prompting)
-    │
-    ▼
-{"aspect_term": "...", "aspect_category": "...",
- "opinion_term": "...", "sentiment": "..."}
-```
-
-**Scripts:** `src/annotation/`  
-**Output:** `data/processed/asqp_annotated.jsonl`
-
-Định dạng dữ liệu annotation:
-```jsonl
-{"review_id": "20192566", "text": "mình mua được giá tốt",
- "quadruples": [{"aspect_term": "giá", "aspect_category": "PRICE#AFFORDABILITY",
-                 "opinion_term": "tốt", "sentiment": "positive"}]}
-```
-
----
-
-### Giai đoạn 4 — Đánh giá chất lượng Annotation
-
-- So sánh kết quả annotation của LLaMA với nhãn human (Label Studio)
-- Tính **Inter-Annotator Agreement** (Cohen's Kappa, F1)
-- Lọc và hiệu chỉnh các mẫu chất lượng thấp
-
-**Scripts:** `src/data_labeling/evaluate_human_vs_llm.py`
-
----
-
-### Giai đoạn 5 — Huấn luyện Models
-
-Ba models được train và so sánh:
-
-| Model | Kiến trúc | Định dạng dữ liệu | Mục đích |
+| Mô hình | AD F1-score | AP F1-score | Ghi chú |
 |---|---|---|---|
-| **BiLSTM-CRF** | Embedding → BiLSTM → CRF | BIO tagging | Baseline (không dùng LLM) |
-| **PhoBERT** | BERT pre-train tiếng Việt + classification head | BIO tagging | Main model |
-| **ViT5** | T5 Seq2Seq pre-train tiếng Việt | Text-to-text | Main model |
+| **PhoBERT** ✅ | **0.7975** | **0.8519** | Mô hình chính, fine-tuned |
+| BiLSTM-CRF | 0.7636 | 0.7951 | BIO sequence labeling |
+| SVM + TF-IDF | 0.7735 | 0.8361 | Baseline |
 
-**Chạy training:**
-```bash
-# Chuẩn bị dữ liệu
-python src/training/prepare_data.py
+> AD = Aspect Detection (nhận diện khía cạnh) · AP = Aspect Polarity (phân loại cảm xúc)
 
-# Train từng model
-python src/training/train_bilstm.py
-python src/training/train_phobert.py
-python src/training/train_vit5.py
+### Hệ thống gợi ý (Hybrid Recommender)
 
-# So sánh kết quả
-python src/training/compare_models.py
+Công thức tính điểm lai:
 
-# Hoặc chạy toàn bộ pipeline
-python src/training/run_all.py
+```
+S_Hybrid = w_ABSA × S_ABSA + w_CBF × S_CBF + w_Category × S_Category
 ```
 
-**Metric đánh giá:** F1 Score (Exact Match Quadruple), Precision, Recall
+| Phương pháp | Precision@5 | Recall@20 |
+|---|---|---|
+| 2 thành phần (ABSA + CBF) | 0.2769 | 0.5229 |
+| **3 thành phần (+ Category)** ✅ | **1.0000** | 0.1844 |
 
+### 17 Khía cạnh được phân tích
 
-## 🚀 Cài đặt và chạy
+`PRODUCT#QUALITY` · `PRODUCT#MATERIAL` · `PRODUCT#DESIGN` · `PRODUCT#SIZE` · `PRODUCT#FUNCTION` · `PRODUCT#COMFORT` · `PRODUCT#SAFETY` · `PRODUCT#VALUE` · `PRODUCT#DURABILITY` · `PRICE#AFFORDABILITY` · `SELLER#SERVICE` · `SELLER#AUTHENTICITY` · `DELIVERY#SPEED` · `DELIVERY#CONDITION` · `PACKAGING#QUALITY` · `PROMOTION#DEALS` · `OVERALL#SATISFACTION`
+
+---
+
+## ⚙️ Cài đặt & Chạy
 
 ### Yêu cầu hệ thống
 
 - Python 3.10+
-- GPU (khuyến nghị, có thể chạy CPU)
-- RAM ≥ 8GB
+- RAM ≥ 8GB (khuyến nghị 16GB để chạy PhoBERT)
+- GPU (tùy chọn, tăng tốc inference)
 
 ### 1. Clone repository
 
 ```bash
-git clone https://github.com/<your-username>/tiki-nlp-asqp.git
-cd tiki-nlp-asqp
+git clone https://github.com/<your-username>/tiki-insight.git
+cd tiki-insight
 ```
 
-### 2. Tạo môi trường ảo
+### 2. Tạo virtual environment
 
 ```bash
 python -m venv .venv
@@ -227,63 +122,105 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 
-# Mac / Linux
+# macOS / Linux
 source .venv/bin/activate
 ```
 
-### 3. Cài thư viện
+### 3. Cài đặt dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Cấu hình biến môi trường
+### 4. Chạy ứng dụng web
 
 ```bash
-# Sao chép file template
-cp .env.example .env
-
-# Mở file .env và điền API key của bạn
-# LLAMA_API_KEY=your_key_here
+uvicorn app.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
-
-## 📊 Kết quả
-
-> Cập nhật sau khi hoàn thành training.
-
-| Model | Precision | Recall | F1 Score |
-|---|---|---|---|
-| BiLSTM-CRF (Baseline) | - | - | - |
-| PhoBERT-base-v2 | - | - | - |
-| ViT5-base | - | - | - |
+Truy cập: [http://localhost:8000](http://localhost:8000)
 
 ---
 
-## 🛠️ Công nghệ sử dụng
+## 🔄 Pipeline xử lý dữ liệu
 
-- **Crawling:** `requests`, `BeautifulSoup`, Tiki Public API
-- **NLP:** `transformers` (HuggingFace), `torch`, `torchcrf`
-- **Models:** [PhoBERT](https://huggingface.co/vinai/phobert-base-v2), [ViT5](https://huggingface.co/VietAI/vit5-base)
-- **Annotation:** LLaMA via API
-- **Labeling UI:** Label Studio
-- **Visualization:** Power BI
-- **Web:** FastAPI, Uvicorn
-- **Khác:** `underthesea`, `pyvi`, `pandas`, `numpy`
+```
+Thu thập (Crawl Tiki API)
+        ↓
+Làm sạch văn bản tiếng Việt
+(chuẩn hóa Unicode, xóa HTML/URL/emoji, loại trùng lặp)
+        ↓
+Gán nhãn tự động (Groq + LLaMA 3.3 70B)
+→ Trích xuất ABSA quadruples: (aspect_category, aspect_term, opinion_term, sentiment)
+        ↓
+Kiểm tra chất lượng annotation
+→ Cohen's Kappa: 0.86 (Aspect), 0.89 (Sentiment)
+        ↓
+Chuẩn bị dữ liệu training
+→ BiLSTM-CRF: định dạng BIO (.txt)
+→ PhoBERT + SVM: định dạng CSV (text + 17 nhãn)
+        ↓
+Huấn luyện & đánh giá mô hình
+        ↓
+Deploy FastAPI Web App
+```
 
 ---
 
-## 📁 Dữ liệu
+## 📊 Quy trình gán nhãn
 
-Dữ liệu thô và dữ liệu đã annotation **không được đưa lên GitHub** do kích thước lớn và điều khoản sử dụng của Tiki.
+Dự án sử dụng **LLM Annotation** (Groq + LLaMA 3.3 70B) để tự động hóa quá trình gán nhãn ABSA trên ~20.000 reviews:
 
-Để tái tạo dữ liệu, chạy theo thứ tự:
-```bash
-python src/crawling/1.Crawl_category_product_id.py
-python src/crawling/2.Crawl_Product_Detail.py
-python src/crawling/3.Crawl_products_listing.py
-python src/crawling/4.Crawl_product_reviews.py
-python src/data_preprocessing/clean_data.py
-python src/data_preprocessing/normalize_text.py
-python src/annotation/run_annotation.py
+1. Xây dựng structured prompt với danh sách 17 nhãn khía cạnh hợp lệ
+2. LLM trả về danh sách quadruples theo định dạng JSONL
+3. Retry tự động với các review không sinh được quadruple hợp lệ
+4. Kiểm tra chất lượng bằng Label Studio trên 200 mẫu ngẫu nhiên
+
+**Kết quả đánh giá annotation:**
+- F1-score (flexible): **81.6%**
+- Cohen's Kappa (Aspect): **0.8607** — Rất tốt
+- Cohen's Kappa (Sentiment): **0.8899** — Rất tốt
+
+---
+
+## 🚀 Tính năng nổi bật của Web App
+
+- **Nhập URL sản phẩm Tiki** 
+- **Biểu đồ cột stacked** phân phối cảm xúc theo 17 khía cạnh
+- **Biểu đồ Radar** so sánh với sản phẩm gợi ý #1
+- **Bảng Opinion Mining** chi tiết với độ tin cậy từng nhận xét
+- **Top 3 đánh giá tiêu biểu** (tích cực nhất / tiêu cực nhất / ngẫu nhiên)
+- **Top 5 sản phẩm được gợi ý** 
+
+---
+
+## 📦 Dependencies chính
+
 ```
+fastapi
+uvicorn
+transformers
+torch
+scikit-learn
+underthesea
+pyvi
+pandas
+numpy
+selenium / requests  # crawling
+```
+
+Xem đầy đủ tại [`requirements.txt`](requirements.txt)
+
+---
+
+## 👩‍💻 Tác giả
+
+| | |
+|---|---|
+| **Sinh viên** | Trần Hoài Huệ |
+| **Chuyên ngành** | Khoa học dữ liệu và phân tích kinh doanh |
+| **Trường** | Đại học Kinh tế Đà Nẵng |
+| **Năm** | 2026 |
+
+---
+

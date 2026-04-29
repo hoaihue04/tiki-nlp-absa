@@ -1,0 +1,29 @@
+{
+  "model": "PhoBERT",
+  "best_val": {
+    "ad_precision": 0.8075213041867358,
+    "ad_recall": 0.8045404208194906,
+    "ad_f1": 0.8060281065088757,
+    "ap_precision": 0.9630649231475109,
+    "ap_recall": 0.7748246585455888,
+    "ap_f1": 0.8587501278510791,
+    "avg_f1": 0.8323891171799773
+  },
+  "test": {
+    "ad_precision": 0.8033277248083754,
+    "ad_recall": 0.7917818315828266,
+    "ad_f1": 0.7975129918337045,
+    "ap_precision": 0.9639283220851758,
+    "ap_recall": 0.7632209323751612,
+    "ap_f1": 0.8519127930892637,
+    "avg_f1": 0.8247128924614842
+  },
+  "config": {
+    "model_name": "vinai/phobert-base-v2",
+    "last_n_layers": 4,
+    "batch_size": 32,
+    "lr": 2e-05,
+    "epochs": 15,
+    "focal_gamma": 2.0
+  }
+}
