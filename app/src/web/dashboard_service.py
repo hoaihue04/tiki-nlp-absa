@@ -1136,7 +1136,7 @@ class DashboardService:
             "neutral_ratio": float(round(sentiment_bucket.get("neutral", 0) / total_sent, 4)),
             "negative_ratio": float(round(sentiment_bucket.get("negative", 0) / total_sent, 4)),
         }
-        advice = _advice_from_score(absa_score)
+        advice = None
         representative = self._representative_reviews(reviews_df, review_scores)
 
         # ── 8. Radar so sánh với top1 recommendation ─────────────────────────
@@ -1180,10 +1180,7 @@ class DashboardService:
                 "category_lv3": str(product_info.get("category_lv3", "")),
                 "sold_quantity": int(product_info.get("sold_quantity", 0)),
             },
-            "advice": {
-                "label": str(advice.get("label", "Cân nhắc")),
-                "tone": str(advice.get("tone", "neutral")),
-            },
+            "advice": None,
             "metrics": metrics,
             "aspect": {
                 "table": [
