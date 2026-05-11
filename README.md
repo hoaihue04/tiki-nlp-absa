@@ -24,7 +24,7 @@ Hệ thống cho phép người dùng dán link sản phẩm Tiki và nhận nga
 ![Demo 0](docs/images/demo0.png)
 | Tổng quan phân tích | Điểm mạnh & điểm yếu | Opinion Mining chi tiết |
 |---|---|---|
-| ![Demo 1](docs/images/demo1.png) | ![Demo 2](docs/images/demo2.png) | ![Demo 3](docs/images/demo3.png) |
+| ![Demo 1](docs/images/demo1.jpg) | ![Demo 2](docs/images/demo2.jpg) | ![Demo 3](docs/images/demo3.jpg) |
 
 ---
 
