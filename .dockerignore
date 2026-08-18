@@ -1,0 +1,12 @@
+.git
+.venv
+.spyproject
+__pycache__
+*.pyc
+*.env
+cache
+checkpoints
+results
+data/raw
+notebooks
+

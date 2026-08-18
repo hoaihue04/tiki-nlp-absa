@@ -1,0 +1,74 @@
+{
+  "an toan": {
+    "aspects": ["PRODUCT#SAFETY"],
+    "constraints": ["safety"]
+  },
+  "da nhay cam": {
+    "aspects": ["PRODUCT#SAFETY", "PRODUCT#MATERIAL", "PRODUCT#SCENT"],
+    "constraints": ["sensitive_skin"]
+  },
+  "kich ung": {
+    "aspects": ["PRODUCT#SAFETY", "PRODUCT#MATERIAL"],
+    "constraints": ["irritation"]
+  },
+  "ham": {
+    "aspects": ["PRODUCT#SAFETY", "PRODUCT#MATERIAL", "PRODUCT#COMFORT"],
+    "constraints": ["rash"]
+  },
+  "mui": {
+    "aspects": ["PRODUCT#SCENT", "PRODUCT#MATERIAL"],
+    "constraints": ["smell"]
+  },
+  "chat lieu": {
+    "aspects": ["PRODUCT#MATERIAL"],
+    "constraints": ["material"]
+  },
+  "mem": {
+    "aspects": ["PRODUCT#MATERIAL", "PRODUCT#COMFORT"],
+    "constraints": ["softness"]
+  },
+  "bi tran": {
+    "aspects": ["PRODUCT#ABSORPTION", "PRODUCT#FUNCTION"],
+    "constraints": ["leakage"]
+  },
+  "tham hut": {
+    "aspects": ["PRODUCT#ABSORPTION", "PRODUCT#FUNCTION"],
+    "constraints": ["absorption"]
+  },
+  "size": {
+    "aspects": ["PRODUCT#SIZE"],
+    "constraints": ["size_fit"]
+  },
+  "vua": {
+    "aspects": ["PRODUCT#SIZE", "PRODUCT#COMFORT"],
+    "constraints": ["fit"]
+  },
+  "gia": {
+    "aspects": ["PRICE#AFFORDABILITY"],
+    "constraints": ["price"]
+  },
+  "dang tien": {
+    "aspects": ["PRICE#AFFORDABILITY", "PRODUCT#QUALITY", "PRODUCT#VALUE"],
+    "constraints": ["value_for_money"]
+  },
+  "giao hang": {
+    "aspects": ["DELIVERY#SPEED", "DELIVERY#PACKAGING"],
+    "constraints": ["delivery"]
+  },
+  "ship": {
+    "aspects": ["DELIVERY#SPEED", "DELIVERY#PACKAGING"],
+    "constraints": ["delivery"]
+  },
+  "dong goi": {
+    "aspects": ["DELIVERY#PACKAGING"],
+    "constraints": ["packaging"]
+  },
+  "chinh hang": {
+    "aspects": ["SELLER#AUTHENTICITY"],
+    "constraints": ["authenticity"]
+  },
+  "fake": {
+    "aspects": ["SELLER#AUTHENTICITY"],
+    "constraints": ["authenticity"]
+  }
+}

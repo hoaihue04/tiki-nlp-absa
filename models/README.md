@@ -1,15 +1,41 @@
-# Models
+# Model Artifacts
 
-Các file model nặng không được lưu trên GitHub do giới hạn dung lượng.
+Các file model nặng không nên commit trực tiếp lên GitHub. Hãy tải hoặc huấn luyện riêng, sau đó đặt vào đúng đường dẫn bên dưới.
 
-## Tải về thủ công
+## Required for Web App
 
-| File | Kích thước | Link |
-|------|-----------|------|
-| `phobert/best_model.pt` | 530 MB | *(upload lên Google Drive/HuggingFace rồi dán link vào đây)* |
-| `phobert/base_model/model.safetensors` | 515 MB | [vinai/phobert-base-v2](https://huggingface.co/vinai/phobert-base-v2) |
-| `recommendation/cbf_model.pkl` | 108 MB | *(upload lên Google Drive rồi dán link vào đây)* |
+| File | Vai trò | Ghi chú |
+|---|---|---|
+| `phobert/best_model.pt` | PhoBERT fine-tuned cho ABSA inference | Cần có để phân tích review trong web app |
 
-## Sau khi tải về
+## Optional / Research
 
-Đặt file đúng đường dẫn trong thư mục `models/` theo cấu trúc project.
+| File | Vai trò |
+|---|---|
+| `bilstm/best_model.pt` | Baseline BiLSTM-CRF |
+| `svm/svm_model.pkl` | Baseline SVM + TF-IDF |
+| `phobert/base_model/` | Tokenizer/base model files nếu chạy local offline |
+| `phobert/tokenizer/` | Tokenizer files cho PhoBERT |
+
+## Suggested Setup
+
+```text
+models/
+├── README.md
+├── phobert/
+│   ├── best_model.pt
+│   ├── base_model/
+│   └── tokenizer/
+├── bilstm/
+│   └── best_model.pt
+└── svm/
+    └── svm_model.pkl
+```
+
+Nếu public repo, nên dùng một trong các cách sau:
+
+- Git LFS cho model artifact lớn.
+- Google Drive/Hugging Face để lưu model và ghi link tải trong README.
+- Script tải model riêng, ví dụ `scripts/download_models.py`.
+
+File `.gitignore` hiện đã ignore `models/**/*.pt` và `models/**/*.pkl` để tránh commit model nặng.

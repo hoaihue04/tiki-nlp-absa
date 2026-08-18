@@ -20,6 +20,7 @@ Cách chạy trên Colab:
 
 import json
 import os
+import shutil
 import time
 import random
 import numpy as np
@@ -47,6 +48,7 @@ class Config:
     DATA_DIR       = 'data/training'
     CHECKPOINT_DIR = 'checkpoints/phobert'
     MODEL_DIR      = 'models/phobert'
+    DRIVE_PROJECT  = '/content/drive/MyDrive/tiki_absa'
 
     # PhoBERT
     PHOBERT_NAME   = 'vinai/phobert-base-v2'  # PhoBERT v2 (tốt hơn v1)
@@ -260,7 +262,9 @@ def compute_ad_ap_f1(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 # ══════════════════════════════════════════════════════════════════════════
 def save_checkpoint(state: dict, path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save(state, path)
+    tmp_path = f'{path}.tmp'
+    torch.save(state, tmp_path)
+    os.replace(tmp_path, path)
 
 
 def load_latest_checkpoint(checkpoint_dir: str):
@@ -288,6 +292,8 @@ def load_latest_checkpoint(checkpoint_dir: str):
 
 def _cleanup_checkpoints(checkpoint_dir: str, keep_last: int = 3):
     """Giữ lại keep_last checkpoint mới nhất, xóa các epoch cũ hơn."""
+    if not os.path.exists(checkpoint_dir):
+        return
     files = [f for f in os.listdir(checkpoint_dir)
              if f.startswith('epoch_') and f.endswith('.pt')]
     if len(files) <= keep_last:
@@ -303,20 +309,41 @@ def _cleanup_checkpoints(checkpoint_dir: str, keep_last: int = 3):
 def sync_to_drive(local_dir: str, drive_dir: str):
     """Sync local dir to Google Drive (nếu đang chạy trong Colab)."""
     try:
-        import shutil
         if not os.path.exists('/content/drive/MyDrive'):
+            return
+        if not os.path.exists(local_dir):
             return
         os.makedirs(drive_dir, exist_ok=True)
         for item in os.listdir(local_dir):
+            if item.endswith('.tmp'):
+                continue
             src = os.path.join(local_dir, item)
             dst = os.path.join(drive_dir, item)
             if os.path.isfile(src):
                 if (not os.path.exists(dst) or
                         os.path.getmtime(src) > os.path.getmtime(dst)):
-                    shutil.copy2(src, dst)
+                    tmp_dst = f'{dst}.tmp'
+                    shutil.copy2(src, tmp_dst)
+                    os.replace(tmp_dst, dst)
         print(f'  [Drive] Synced {local_dir} -> {drive_dir}')
     except Exception as e:
         print(f'  [Drive] Sync skipped: {e}')
+
+
+def sync_file_to_drive(local_path: str, drive_path: str):
+    """Sync a single file to Google Drive with an atomic replace."""
+    try:
+        if not os.path.exists('/content/drive/MyDrive'):
+            return
+        if not os.path.exists(local_path):
+            return
+        os.makedirs(os.path.dirname(drive_path), exist_ok=True)
+        tmp_path = f'{drive_path}.tmp'
+        shutil.copy2(local_path, tmp_path)
+        os.replace(tmp_path, drive_path)
+        print(f'  [Drive] Synced {local_path} -> {drive_path}')
+    except Exception as e:
+        print(f'  [Drive] File sync skipped: {e}')
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -417,8 +444,12 @@ def main():
     ckpt, last_ep = load_latest_checkpoint(CFG.CHECKPOINT_DIR)
     if ckpt is not None:
         model.load_state_dict(ckpt['model_state'])
-        # Khong load optimizer/scheduler state — incompatible giua cac PyTorch versions
-        # Model weights la du de resume dung, optimizer se bat dau lai tu dau
+        try:
+            optimizer.load_state_dict(ckpt['optimizer_state'])
+            scheduler.load_state_dict(ckpt['scheduler_state'])
+            print('  [RESUME] Optimizer/scheduler state restored')
+        except Exception as e:
+            print(f'  [RESUME] Optimizer/scheduler state skipped ({type(e).__name__})')
         start_epoch  = last_ep + 1
         best_avg_f1  = ckpt.get('best_avg_f1', 0.0)
         no_improve   = ckpt.get('no_improve', 0)
@@ -443,24 +474,9 @@ def main():
               f'avg={avg_f1:.4f} | '
               f't={elapsed:.1f}s')
 
-        # Checkpoint
-        ckpt_data = {
-            'epoch':           epoch,
-            'model_state':     model.state_dict(),
-            'optimizer_state': optimizer.state_dict(),
-            'scheduler_state': scheduler.state_dict(),
-            'best_avg_f1':     best_avg_f1,
-            'no_improve':      no_improve,
-            'best_metrics':    best_metrics,
-            'val_metrics':     val_m,
-        }
-        save_checkpoint(ckpt_data, f'{CFG.CHECKPOINT_DIR}/epoch_{epoch}.pt')
-
-        # Xóa checkpoint cũ (giữ 3 gần nhất để tiết kiệm dung lượng)
-        _cleanup_checkpoints(CFG.CHECKPOINT_DIR, keep_last=3)
-
         # Best model
-        if avg_f1 > best_avg_f1:
+        improved = avg_f1 > best_avg_f1
+        if improved:
             best_avg_f1  = avg_f1
             best_metrics = val_m.copy()
             no_improve   = 0
@@ -474,16 +490,30 @@ def main():
             print(f'  ★ Best! avg_f1={avg_f1:.4f}')
             # Sync best model lên Drive ngay lập tức
             sync_to_drive(CFG.MODEL_DIR,
-                          f'/content/drive/MyDrive/tiki_absa/models/phobert')
+                          f'{CFG.DRIVE_PROJECT}/models/phobert')
         else:
             no_improve += 1
+
+        ckpt_data = {
+            'epoch':           epoch,
+            'model_state':     model.state_dict(),
+            'optimizer_state': optimizer.state_dict(),
+            'scheduler_state': scheduler.state_dict(),
+            'best_avg_f1':     best_avg_f1,
+            'no_improve':      no_improve,
+            'best_metrics':    best_metrics,
+            'val_metrics':     val_m,
+        }
+        save_checkpoint(ckpt_data, f'{CFG.CHECKPOINT_DIR}/epoch_{epoch}.pt')
+        _cleanup_checkpoints(CFG.CHECKPOINT_DIR, keep_last=3)
+
+        sync_to_drive(CFG.CHECKPOINT_DIR,
+                      f'{CFG.DRIVE_PROJECT}/checkpoints/phobert')
+
+        if not improved:
             if no_improve >= CFG.PATIENCE:
                 print(f'\n  Early stopping (patience={CFG.PATIENCE}).')
                 break
-
-        # Sync checkpoint epoch này lên Drive
-        sync_to_drive(CFG.CHECKPOINT_DIR,
-                      f'/content/drive/MyDrive/tiki_absa/checkpoints/phobert')
 
     # 7. Test
     print('\n[5] Đánh giá trên TEST set (best model)...')
@@ -536,6 +566,10 @@ def main():
     os.makedirs('results', exist_ok=True)
     with open('results/phobert_results.json', 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
+    sync_to_drive(CFG.MODEL_DIR, f'{CFG.DRIVE_PROJECT}/models/phobert')
+    sync_to_drive(CFG.CHECKPOINT_DIR, f'{CFG.DRIVE_PROJECT}/checkpoints/phobert')
+    sync_file_to_drive('results/phobert_results.json',
+                       f'{CFG.DRIVE_PROJECT}/results/phobert_results.json')
     print('\n  Kết quả: results/phobert_results.json')
     print('  Model  : models/phobert/best_model.pt')
 

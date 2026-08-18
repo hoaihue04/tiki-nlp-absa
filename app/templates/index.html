@@ -6,7 +6,7 @@
   <title>Tiki Insight — ABSA Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=seller-radar-only-20260801" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -78,6 +78,36 @@
       </div>
     </section>
 
+    <nav class="audience-tabs" aria-label="Chế độ xem kết quả">
+      <button class="audience-tab active" type="button" data-tab="parent-tab">User</button>
+      <button class="audience-tab" type="button" data-tab="seller-tab">Seller dashboard</button>
+    </nav>
+
+    <section id="parent-tab" class="tab-panel active">
+      <section class="panel parent-chat-panel">
+        <div class="parent-panel-head">
+          <div>
+            <p class="section-kicker">Hỏi đáp theo sản phẩm</p>
+            <h3 class="panel-title">Hỏi trợ lý về sản phẩm này</h3>
+          </div>
+        </div>
+        <div class="quick-questions">
+          <button type="button" data-question="Sản phẩm này có điểm gì cần lưu ý?">Điểm cần lưu ý</button>
+          <button type="button" data-question="Có phù hợp cho bé da nhạy cảm không?">Bé da nhạy cảm</button>
+          <button type="button" data-question="Người mua phàn nàn nhiều nhất về điều gì?">Phàn nàn nhiều</button>
+        </div>
+        <div id="chat-output" class="chat-output">
+          <div class="assistant-message muted">Hãy phân tích một sản phẩm, sau đó đặt câu hỏi về đúng sản phẩm đó.</div>
+        </div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-question" type="text" placeholder="Ví dụ: Sản phẩm này có hợp với bé 6 tháng không?" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+    </section>
+
+    <section id="seller-tab" class="tab-panel">
+
     <!-- Metric row -->
     <section class="metrics-strip" id="metrics-grid"></section>
 
@@ -90,7 +120,7 @@
         </div>
       </article>
       <article class="panel chart-panel chart-panel--narrow">
-        <h3 class="panel-title">📊 Radar so sánh với sản phẩm gợi ý #1</h3>
+        <h3 class="panel-title">RADAR khía cạnh sản phẩm</h3>
         <div class="chart-wrap">
           <canvas id="aspectRadarChart"></canvas>
         </div>
@@ -99,14 +129,7 @@
             <span style="display:inline-block;width:20px;height:2px;background:#2563eb;border-radius:2px"></span>
             <span style="font-size:11px">Sản phẩm hiện tại</span>
           </span>
-          <span style="display:inline-flex;align-items:center;gap:6px">
-            <span style="display:inline-block;width:20px;height:2px;background:#f59e0b;border-radius:2px;background-image:repeating-linear-gradient(90deg,#f59e0b,#f59e0b 4px,transparent 4px,transparent 8px)"></span>
-            <span style="font-size:11px">Sản phẩm gợi ý #1</span>
-          </span>
         </div>
-        <p style="font-size:10px;color:var(--text-3);text-align:center;margin-top:8px;margin-bottom:0">
-          ⚡ Điểm số được chuẩn hóa từ 0-1 (0=tiêu cực, 0.5=trung tính, 1=tích cực)
-        </p>
       </article>
     </section>
 
@@ -157,17 +180,10 @@
       <div id="review-cards" class="review-grid"></div>
     </section>
 
-    <!-- Recommendations -->
-    <section class="panel">
-      <div class="rec-header">
-        <h3 class="panel-title">🎯 Top 5 sản phẩm được gợi ý</h3>
-        <span id="rec-weights" class="rec-weights"></span>
-      </div>
-      <div id="recommend-grid" class="rec-grid"></div>
     </section>
 
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=seller-radar-only-20260801"></script>
 </body>
 </html>

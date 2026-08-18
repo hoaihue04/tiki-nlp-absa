@@ -1,226 +1,184 @@
-# 🍼 TikiInsight — Phân Tích Cảm Xúc & Hệ Thống Đề Xuất Sản Phẩm Sơ Sinh
+# TikiInsight - ABSA Dashboard & AI Shopping Assistant
 
-> **Ứng dụng NLP để phân tích phản hồi khách hàng và xây dựng hệ thống đề xuất sản phẩm dành cho trẻ sơ sinh trên sàn thương mại điện tử Tiki**
+TikiInsight là hệ thống phân tích đánh giá sản phẩm Tiki bằng NLP, tập trung vào **Aspect-Based Sentiment Analysis (ABSA)** và **AI Shopping Assistant**. Ứng dụng giúp chuyển hàng trăm đánh giá rời rạc của người mua thành dashboard phân tích dễ hiểu và câu trả lời tư vấn mua sắm tự nhiên.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
 ![PhoBERT](https://img.shields.io/badge/Model-PhoBERT-orange)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
+![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql)
+![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED?logo=docker)
 
----
+## Bối Cảnh
 
-## 📌 Giới thiệu
+Trên các sàn thương mại điện tử, người mua thường phải đọc rất nhiều review để trả lời những câu hỏi đơn giản:
 
-**TikiInsight** là hệ thống phân tích cảm xúc theo khía cạnh (Aspect-Based Sentiment Analysis - ABSA) và đề xuất sản phẩm thông minh, được xây dựng cho ngành hàng mẹ & bé trên nền tảng Tiki.vn.
+- Sản phẩm này có đáng mua không?
+- Người mua khen/chê nhiều nhất ở điểm nào?
+- Có rủi ro gì về kích thước, chất liệu, an toàn, giao hàng hay bao bì không?
+- Sản phẩm có phù hợp với nhu cầu cụ thể như bé da nhạy cảm, cần thấm hút tốt, cần size thoải mái không?
 
-Hệ thống cho phép người dùng dán link sản phẩm Tiki và nhận ngay:
-- 📊 **Phân tích cảm xúc** theo từng khía cạnh sản phẩm (chất lượng, chất liệu, giá cả, an toàn, giao hàng...)
-- 🎯 **Điểm ABSA tổng hợp** và biểu đồ radar so sánh với sản phẩm cùng phân khúc
-- 💡 **Gợi ý Top-5 sản phẩm** thay thế theo thuật toán Hybrid Recommender
+Review thô thường dài, trùng lặp, cảm xúc lẫn lộn và khó tổng hợp. Vì vậy, TikiInsight được xây dựng để phân tích review theo từng khía cạnh, sau đó biến kết quả phân tích thành dashboard và chatbot tư vấn dễ hiểu.
 
----
 
-## 🖼️ Demo
-![Demo 0](docs/images/demo0.png)
-| Tổng quan phân tích | Điểm mạnh & điểm yếu | Opinion Mining chi tiết |
+## Cách Giải Quyết
+
+TikiInsight kết hợp 3 lớp xử lý:
+
+1. **PhoBERT ABSA**
+   - Nhận diện khía cạnh được nhắc đến trong từng câu review.
+   - Phân loại sentiment theo từng khía cạnh: positive, neutral, negative.
+
+2. **Analytics Layer**
+   - Tổng hợp thống kê theo PostgreSQL: top praise, top complaint, tỷ lệ positive/negative theo aspect, review statistics.
+   - Phát hiện risk flags từ các nhóm phản hồi tiêu cực.
+
+3. **AI Shopping Assistant**
+
+    -Trả lời 1 số câu hỏi cơ bản về sản phẩm 
+
+## Demo
+
+![Demo tổng quan](docs/images/demo0.png)
+
+| User Chatbot | Seller Dashboard | Opinion Mining |
 |---|---|---|
-| ![Demo 1](docs/images/demo1.jpg) | ![Demo 2](docs/images/demo2.jpg) | ![Demo 3](docs/images/demo3.jpg) |
+| ![Demo 1](docs/images/demo1.png) | ![Demo 2](docs/images/demo2.png) | ![Demo 3](docs/images/demo3.png) |
 
----
+## Tính Năng Nổi Bật Của Web App
 
-## 🏗️ Kiến trúc hệ thống
+### User
 
-```
-TIKI/
-│
-├── app/                         # 🌐 Web Demo (FastAPI)
-│   ├── src/                     # Logic xử lý backend
-│   ├── static/                  # CSS, JS, assets
-│   ├── templates/               # HTML templates (Jinja2)
-│   └── app.py                   # Entry point FastAPI
-│
-├── data/                        # 📊 Dữ liệu
-│   ├── raw/                     # Dữ liệu thô từ Tiki
-│   ├── interim/                 # Dữ liệu trung gian
-│   ├── processed/               # Dữ liệu đã xử lý (20,446 reviews)
-│   └── training/                # Tập train/val/test (split 70:15:15)
-│
-├── models/                      # 🤖 Các mô hình ML/DL
-│   ├── bilstm/                  # BiLSTM-CRF (sequence labeling)
-│   ├── phobert/                 # PhoBERT fine-tuned (ABSA chính)
-│   ├── recommendation/          # Hybrid Recommender
-│   └── svm/                     # SVM+TF-IDF (baseline)
-│
-├── src/                         # 🧠 Core pipeline
-│   ├── annotation/              # LLM Annotation (Groq + LLaMA 3.3 70B)
-│   ├── crawling/                # Crawl dữ liệu từ Tiki API
-│   ├── data_labeling/           # Label Studio integration
-│   ├── data_preprocessing/      # Tiền xử lý văn bản tiếng Việt
-│   ├── recommendation/          # Thuật toán gợi ý hybrid
-│   ├── training/                # Training pipeline
-│   └── utils/                   # Hàm tiện ích
-│
-├── notebooks/                   # Jupyter Notebook (EDA, thử nghiệm)
-├── results/                     # Kết quả output (metrics, predict)
-├── checkpoints/                 # Model checkpoints
-└── requirements.txt
-```
+- Chatbot hỏi đáp theo sản phẩm đã phân tích.
+- Trả lời bằng tiếng Việt có dấu, thân thiện, giống tư vấn mua sắm.
+- Tóm tắt ưu điểm, điểm cần lưu ý, khuyến nghị và độ tin cậy.
+- Bằng chứng tham khảo được nén ngắn theo khía cạnh, ví dụ: Kích thước, Chất lượng, Bao bì, Giao hàng.
 
----
+### Seller Dashboard
 
-## 🤖 Các mô hình sử dụng
+- Tổng quan thông tin sản phẩm Tiki: tên, giá, rating, số review.
+- Thống kê số review sử dụng, tỷ lệ sentiment và số khía cạnh được nhắc đến.
+- Biểu đồ stacked sentiment theo khía cạnh.
+- RADAR khía cạnh sản phẩm.
+- Danh sách điểm mạnh nổi bật và điểm yếu cần cải thiện.
+- Bảng Opinion Mining chi tiết theo aspect, sentiment, confidence và số lượt nhắc.
+- Review tiêu biểu theo nhóm tích cực, tiêu cực và trung lập.
 
-### Phân tích cảm xúc theo khía cạnh (ABSA)
+## Các Mô Hình Phân Tích Cảm Xúc Theo Khía Cạnh
 
-| Mô hình | AD F1-score | AP F1-score | Ghi chú |
-|---|---|---|---|
-| **PhoBERT** ✅ | **0.7975** | **0.8519** | Mô hình chính, fine-tuned |
-| BiLSTM-CRF | 0.7636 | 0.7951 | BIO sequence labeling |
-| SVM + TF-IDF | 0.7735 | 0.8361 | Baseline |
+Dự án có các hướng mô hình phục vụ nghiên cứu và so sánh:
 
-> AD = Aspect Detection (nhận diện khía cạnh) · AP = Aspect Polarity (phân loại cảm xúc)
-
-### Hệ thống gợi ý (Hybrid Recommender)
-
-Công thức tính điểm lai:
-
-```
-S_Hybrid = w_ABSA × S_ABSA + w_CBF × S_CBF + w_Category × S_Category
-```
-
-| Phương pháp | Precision@5 | Recall@20 |
+| Mô hình | Vai trò | Ghi chú |
 |---|---|---|
-| 2 thành phần (ABSA + CBF) | 0.2769 | 0.5229 |
-| **3 thành phần (+ Category)** ✅ | **1.0000** | 0.1844 |
+| PhoBERT fine-tuned | Mô hình ABSA chính trong web app | Dùng để nhận diện aspect và sentiment |
+| BiLSTM-CRF | Baseline sequence labeling | Phục vụ so sánh trong quá trình nghiên cứu |
+| SVM + TF-IDF | Baseline truyền thống | Phục vụ so sánh với hướng deep learning |
 
-### 17 Khía cạnh được phân tích
+Kết quả thực nghiệm đã ghi nhận trong project:
 
-`PRODUCT#QUALITY` · `PRODUCT#MATERIAL` · `PRODUCT#DESIGN` · `PRODUCT#SIZE` · `PRODUCT#FUNCTION` · `PRODUCT#COMFORT` · `PRODUCT#SAFETY` · `PRODUCT#VALUE` · `PRODUCT#DURABILITY` · `PRICE#AFFORDABILITY` · `SELLER#SERVICE` · `SELLER#AUTHENTICITY` · `DELIVERY#SPEED` · `DELIVERY#CONDITION` · `PACKAGING#QUALITY` · `PROMOTION#DEALS` · `OVERALL#SATISFACTION`
+| Mô hình | Aspect Detection F1 | Aspect Polarity F1 |
+|---|---:|---:|
+| PhoBERT | 0.7975 | 0.8519 |
+| BiLSTM-CRF | 0.7636 | 0.7951 |
+| SVM + TF-IDF | 0.7735 | 0.8361 |
 
----
+## Nhóm Khía Cạnh Được Phân Tích
 
-## ⚙️ Cài đặt & Chạy
+Một số khía cạnh tiêu biểu:
 
-### Yêu cầu hệ thống
+- Chất lượng sản phẩm
+- Chất liệu
+- Kích thước
+- Độ an toàn
+- Khả năng thấm hút
+- Độ thoải mái
+- Độ bền
+- Giá cả
+- Giao hàng
+- Bao bì
+- Tính chính hãng
 
-- Python 3.10+
-- RAM ≥ 8GB (khuyến nghị 16GB để chạy PhoBERT)
-- GPU (tùy chọn, tăng tốc inference)
+Trong backend, các aspect có thể được lưu bằng mã nội bộ như `PRODUCT#QUALITY`, nhưng khi hiển thị cho người dùng hệ thống sẽ map sang nhãn thân thiện như **Chất lượng**, **Kích thước**, **Giá cả**, **Giao hàng**.
 
-### 1. Clone repository
+## Pipeline Xử Lý Dữ Liệu
 
-```bash
-git clone https://github.com/<your-username>/tiki-insight.git
-cd tiki-insight
+```text
+Thu thập dữ liệu từ Tiki API
+    ↓
+Làm sạch review
+    ↓
+Tách câu và chuẩn hóa tiếng Việt
+    ↓
+Gán nhãn/chuẩn bị dữ liệu ABSA
+    ↓
+Huấn luyện và đánh giá mô hình
+    ↓
+Chạy PhoBERT inference trên review mới
+    ↓
+Tổng hợp aspect sentiment
+    ↓
+Lưu PostgreSQL
+    ↓
+Hiển thị dashboard và phục vụ chatbot
 ```
 
-### 2. Tạo virtual environment
+## Core Technologies
 
-```bash
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-```
-
-### 3. Cài đặt dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Chạy ứng dụng web
-
-```bash
-uvicorn app.app:app --reload --host 0.0.0.0 --port 8000
-```
-
-Truy cập: [http://localhost:8000](http://localhost:8000)
-
----
-
-## 🔄 Pipeline xử lý dữ liệu
-
-```
-Thu thập (Crawl Tiki API)
-        ↓
-Làm sạch văn bản tiếng Việt
-(chuẩn hóa Unicode, xóa HTML/URL/emoji, loại trùng lặp)
-        ↓
-Gán nhãn tự động (Groq + LLaMA 3.3 70B)
-→ Trích xuất ABSA quadruples: (aspect_category, aspect_term, opinion_term, sentiment)
-        ↓
-Kiểm tra chất lượng annotation
-→ Cohen's Kappa: 0.86 (Aspect), 0.89 (Sentiment)
-        ↓
-Chuẩn bị dữ liệu training
-→ BiLSTM-CRF: định dạng BIO (.txt)
-→ PhoBERT + SVM: định dạng CSV (text + 17 nhãn)
-        ↓
-Huấn luyện & đánh giá mô hình
-        ↓
-Deploy FastAPI Web App
-```
-
----
-
-## 📊 Quy trình gán nhãn
-
-Dự án sử dụng **LLM Annotation** (Groq + LLaMA 3.3 70B) để tự động hóa quá trình gán nhãn ABSA trên ~20.000 reviews:
-
-1. Xây dựng structured prompt với danh sách 17 nhãn khía cạnh hợp lệ
-2. LLM trả về danh sách quadruples theo định dạng JSONL
-3. Retry tự động với các review không sinh được quadruple hợp lệ
-4. Kiểm tra chất lượng bằng Label Studio trên 200 mẫu ngẫu nhiên
-
-**Kết quả đánh giá annotation:**
-- F1-score (flexible): **81.6%**
-- Cohen's Kappa (Aspect): **0.8607** — Rất tốt
-- Cohen's Kappa (Sentiment): **0.8899** — Rất tốt
-
----
-
-## 🚀 Tính năng nổi bật của Web App
-
-- **Nhập URL sản phẩm Tiki** 
-- **Biểu đồ cột stacked** phân phối cảm xúc theo 17 khía cạnh
-- **Biểu đồ Radar** so sánh với sản phẩm gợi ý #1
-- **Bảng Opinion Mining** chi tiết với độ tin cậy từng nhận xét
-- **Top 3 đánh giá tiêu biểu** (tích cực nhất / tiêu cực nhất / ngẫu nhiên)
-- **Top 5 sản phẩm được gợi ý** 
-
----
-
-## 📦 Dependencies chính
-
-```
-fastapi
-uvicorn
-transformers
-torch
-scikit-learn
-underthesea
-pyvi
-pandas
-numpy
-selenium / requests  # crawling
-```
-
-Xem đầy đủ tại [`requirements.txt`](requirements.txt)
-
----
-
-## 👩‍💻 Tác giả
-
-| | |
+| Nhóm | Công nghệ |
 |---|---|
-| **Sinh viên** | Trần Hoài Huệ |
-| **Chuyên ngành** | Khoa học dữ liệu và phân tích kinh doanh |
-| **Trường** | Đại học Kinh tế Đà Nẵng |
-| **Năm** | 2026 |
+| Backend | Python, FastAPI, Pydantic, SQLAlchemy |
+| Frontend | HTML, CSS, JavaScript, Jinja2, Chart.js |
+| NLP / Machine Learning | PhoBERT, PyTorch, Hugging Face Transformers, scikit-learn |
+| LLM / RAG | Gemini/Groq API, intent detection, hybrid retrieval, evidence compression, structured JSON output |
+| Database / Retrieval | PostgreSQL, Qdrant, Redis |
+| Infrastructure | Docker, Docker Compose |
+| Data Processing | pandas, NumPy, regex, pyvi, underthesea |
 
----
 
+
+## Cài Đặt Và Chạy
+
+### Cách 1: Docker Compose
+
+Yêu cầu:
+
+- Docker Desktop
+- Model PhoBERT tại `models/phobert/best_model.pt`
+
+Chạy:
+
+```powershell
+docker compose up -d --build
+```
+
+Mở ứng dụng:
+
+```text
+http://127.0.0.1:8001
+```
+
+Kiểm tra server:
+
+```text
+http://127.0.0.1:8001/api/health
+```
+
+### Cách 2: Chạy local
+
+Tạo môi trường:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Chạy FastAPI:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.app:app --host 127.0.0.1 --port 8001
+```
+
+Mở:
+
+```text
+http://127.0.0.1:8001
+```

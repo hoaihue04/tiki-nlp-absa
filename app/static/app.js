@@ -1,6 +1,7 @@
 "use strict";
 let stackedChart = null;
 let radarChart   = null;
+let currentProductId = null;
 
 // ─── Aspect Vietnamese map ─────────────────────────────────────────────────
 const ASPECT_VI = {
@@ -229,12 +230,10 @@ function renderHeader(data) {
     shortDescEl.style.display = "none";
   }
 
-  // Giá + điểm ABSA
-  const m = data.metrics || {};
+  // Gia + so sao Tiki
   const price = Number(pi.price) || 0;
   const origPx = Number(pi.original_price) || 0;
   const disc = (origPx > price && origPx > 0 && price > 0) ? Math.round((1 - price / origPx) * 100) : null;
-  const absa5 = ((m.absa_score || 0) * 5).toFixed(1);
   const rating = pi.rating_average ? Number(pi.rating_average).toFixed(1) : null;
   const soldTxt = pi.sold_text || (pi.sold_quantity > 0 ? Number(pi.sold_quantity).toLocaleString("vi-VN") : "");
 
@@ -258,9 +257,8 @@ function renderHeader(data) {
         ${priceHtml}
         ${soldTxt ? '<div class="sold-count">✓ Đã bán: ' + soldTxt + '</div>' : ''}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
-          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Điểm ABSA</div>
-          <div style="font-size:26px;font-weight:800;color:var(--blue)">${absa5}<span style="font-size:14px;color:var(--text-3)">/5</span></div>
-          ${rating ? '<div style="font-size:12px;color:var(--text-3);margin-top:4px">⭐ ' + rating + ' sao (Tiki)</div>' : ''}
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Đánh giá Tiki</div>
+          <div style="font-size:26px;font-weight:800;color:var(--amber)">${rating ? '⭐ ' + rating : '—'}<span style="font-size:14px;color:var(--text-3)">/5</span></div>
         </div>
       </div>
     `;
@@ -326,17 +324,12 @@ function renderCharts(data) {
   const aspect   = data.aspect || {};
   const rows     = (aspect.table || []);
   const radar    = (aspect.radar || []);
-  const top1Scores = data.top1_aspect_scores || {};
 
   const mentionedRows  = rows.filter(r => (r.positive || 0) + (r.neutral || 0) + (r.negative || 0) > 0);
   const mentionedRadar = radar.filter(r => r.score != null && r.score > 0);
 
   const radarLabels      = mentionedRadar.map(r => aspectVi(r.aspect));
   const currentScores    = mentionedRadar.map(r => r.score || 0.5);
-  const top1ScoresArray  = mentionedRadar.map(r => {
-    const score = top1Scores[r.aspect];
-    return score !== undefined ? score : 0.5;
-  });
 
   if (stackedChart) { stackedChart.destroy(); stackedChart = null; }
   if (radarChart)   { radarChart.destroy();   radarChart   = null; }
@@ -374,9 +367,7 @@ function renderCharts(data) {
 
   // Radar chart
   const ctx2 = document.getElementById("aspectRadarChart").getContext("2d");
-  const top1Name       = data.recommendations?.top_products?.[0]?.name || "Top 1";
   const currentName    = data.product_info?.name || "Sản phẩm này";
-  const shortTop1Name  = top1Name.length    > 25 ? top1Name.substring(0, 22)    + "..." : top1Name;
   const shortCurrName  = currentName.length > 25 ? currentName.substring(0, 22) + "..." : currentName;
 
   radarChart = new Chart(ctx2, {
@@ -393,17 +384,6 @@ function renderCharts(data) {
           pointBorderColor: "#fff",
           pointRadius: 4,
           borderWidth: 2.5,
-        },
-        {
-          label: `🏆 ${shortTop1Name} (Top gợi ý)`,
-          data: top1ScoresArray,
-          borderColor: "#f59e0b",
-          backgroundColor: "rgba(245,158,11,.08)",
-          pointBackgroundColor: "#f59e0b",
-          pointBorderColor: "#fff",
-          pointRadius: 4,
-          borderWidth: 2.5,
-          borderDash: [5, 5],
         },
       ],
     },
@@ -449,10 +429,6 @@ function renderSW(data) {
       return `<li style="color:var(--text-3);padding:12px">Không có dữ liệu</li>`;
     }
     return items.map(r => {
-      const score        = r.avg_score_0_1 ?? r.score ?? 0;
-      const scoreSign    = type === "positive" ? "+" : "-";
-      const scoreDisplay = `${scoreSign}${(score * 5).toFixed(1)}`;
-
       let quoteText = "";
       let likeCount = 0;
 
@@ -485,7 +461,6 @@ function renderSW(data) {
         <li class="sw-item">
           <div class="sw-item-header">
             <span class="sw-aspect">${aspectIcon(r.aspect)} ${aspectVi(r.aspect)}</span>
-            <span class="sw-score-badge">${scoreDisplay}</span>
           </div>
           ${quoteText
             ? `<div class="sw-quote">
@@ -646,7 +621,106 @@ function renderRecommendations(data) {
   }).join("");
 }
 
+function setActiveTab(tabId) {
+  document.querySelectorAll(".audience-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabId);
+  });
+  document.querySelectorAll(".tab-panel").forEach(panel => {
+    panel.classList.toggle("active", panel.id === tabId);
+  });
+}
+
+function renderParentAssistant(data) {
+  const pi = data.product_info || {};
+  currentProductId = pi.product_id || null;
+}
+
+async function askAssistant(question) {
+  if (!currentProductId) {
+    alert("Hãy phân tích sản phẩm trước khi hỏi trợ lý.");
+    return;
+  }
+  const output = document.getElementById("chat-output");
+  if (!output) return;
+  const pendingId = `chat-pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  output.insertAdjacentHTML("beforeend", `<div class="user-message">${escHtml(question)}</div>`);
+  output.insertAdjacentHTML("beforeend", `<div class="assistant-message muted" id="${pendingId}">Đang tìm bằng chứng...</div>`);
+  output.scrollTop = output.scrollHeight;
+
+  try {
+    const resp = await fetch("/api/assistant/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: currentProductId, question, use_llm: true }),
+    });
+    const pending = document.getElementById(pendingId);
+    if (pending) pending.remove();
+    if (!resp.ok) {
+      let msg = "Không thể trả lời câu hỏi này";
+      try { msg = (await resp.json()).detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    const citations = (data.structured_answer && data.structured_answer.citations && data.structured_answer.citations.length)
+      ? data.structured_answer.citations
+      : (data.evidence || []).map(e => ({ aspect: e.aspect_label || e.aspect || "Bằng chứng", evidence: e.text || "" }));
+    const evidenceHtml = citations.slice(0, 3).map(e =>
+      `<li><span>${escHtml(aspectLabel(e.aspect || "Bằng chứng"))}</span>${escHtml((e.evidence || "").slice(0, 180))}</li>`
+    ).join("");
+    output.insertAdjacentHTML("beforeend", `
+      <div class="assistant-message">
+        <p>${answerHtml(data.answer || "Chưa có câu trả lời.")}</p>
+        ${evidenceHtml ? `<div class="chat-evidence-title">Bằng chứng tham khảo</div><ul class="chat-evidence">${evidenceHtml}</ul>` : ""}
+      </div>
+    `);
+  } catch (err) {
+    const pending = document.getElementById(pendingId);
+    if (pending) pending.remove();
+    output.insertAdjacentHTML("beforeend", `<div class="assistant-message error">${escHtml(err.message)}</div>`);
+  } finally {
+    output.scrollTop = output.scrollHeight;
+  }
+}
+
 // ─── Analyze with SSE progress ─────────────────────────────────────────────
+function answerHtml(text) {
+  return escHtml(text).replace(/\n/g, "<br>");
+}
+
+function aspectLabel(aspect) {
+  const labels = {
+    "PRODUCT#SAFETY": "Độ an toàn",
+    "PRODUCT#MATERIAL": "Chất liệu",
+    "PRODUCT#SCENT": "Mùi sản phẩm",
+    "PRODUCT#SIZE": "Kích thước",
+    "PRODUCT#ABSORPTION": "Khả năng thấm hút",
+    "PRODUCT#FUNCTION": "Công năng",
+    "PRODUCT#QUALITY": "Chất lượng",
+    "PRODUCT#VALUE": "Độ đáng tiền",
+    "PRODUCT#DURABILITY": "Độ bền",
+    "PRODUCT#COMFORT": "Độ thoải mái",
+    "PRICE#AFFORDABILITY": "Giá cả",
+    "DELIVERY#SPEED": "Giao hàng",
+    "DELIVERY#PACKAGING": "Bao bì",
+    "DELIVERY#ACCURACY": "Giao đúng/đủ hàng",
+    "SELLER#AUTHENTICITY": "Tính chính hãng",
+  };
+  return labels[aspect] || aspect;
+}
+
+function riskLabel(risk) {
+  const labels = {
+    safety: "Độ an toàn",
+    authenticity: "Tính chính hãng",
+    material: "Chất liệu",
+    size_fit: "Kích thước",
+    durability: "Độ bền",
+    delivery_packaging: "Bao bì",
+    delivery_accuracy: "Giao đúng/đủ hàng",
+  };
+  return labels[risk] || risk;
+}
+
 async function analyze() {
   const url = document.getElementById("product-url").value.trim();
   if (!url) { alert("Vui lòng nhập link sản phẩm Tiki"); return; }
@@ -723,6 +797,26 @@ document.getElementById("product-url").addEventListener("keydown", (e) => {
   if (e.key === "Enter") analyze();
 });
 
+document.querySelectorAll(".audience-tab").forEach(btn => {
+  btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+});
+
+document.querySelectorAll(".quick-questions button").forEach(btn => {
+  btn.addEventListener("click", () => askAssistant(btn.dataset.question || btn.textContent.trim()));
+});
+
+const chatForm = document.getElementById("chat-form");
+if (chatForm) {
+  chatForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("chat-question");
+    const question = (input?.value || "").trim();
+    if (!question) return;
+    input.value = "";
+    askAssistant(question);
+  });
+}
+
 // Hàm renderAll (đã loại bỏ recommendation banner)
 function renderAll(data) {
   if (!data) { 
@@ -734,15 +828,14 @@ function renderAll(data) {
   debugLog("Product info:", data.product_info);
   debugLog("Metrics:", data.metrics);
   debugLog("Aspect table length:", data.aspect?.table?.length);
-  debugLog("Recommendations:", data.recommendations?.top_products?.length);
   
   try { renderHeader(data); }          catch (e) { console.error("renderHeader ERROR:", e); }
+  try { renderParentAssistant(data); } catch (e) { console.error("renderParentAssistant ERROR:", e); }
   try { renderMetrics(data); }         catch (e) { console.error("renderMetrics ERROR:", e); }
   try { renderCharts(data); }          catch (e) { console.error("renderCharts ERROR:", e); }
   try { renderSW(data); }              catch (e) { console.error("renderSW ERROR:", e); }
   try { renderOpinion(data); }         catch (e) { console.error("renderOpinion ERROR:", e); }
   try { renderReviews(data); }         catch (e) { console.error("renderReviews ERROR:", e); }
-  try { renderRecommendations(data); } catch (e) { console.error("renderRecommendations ERROR:", e); }
 
   document.getElementById("result-root").classList.remove("hidden");
   debugLog("=== RENDER ALL COMPLETE ===");
