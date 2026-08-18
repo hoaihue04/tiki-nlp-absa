@@ -1,184 +1,247 @@
 # TikiInsight - ABSA Dashboard & AI Shopping Assistant
 
-TikiInsight là hệ thống phân tích đánh giá sản phẩm Tiki bằng NLP, tập trung vào **Aspect-Based Sentiment Analysis (ABSA)** và **AI Shopping Assistant**. Ứng dụng giúp chuyển hàng trăm đánh giá rời rạc của người mua thành dashboard phân tích dễ hiểu và câu trả lời tư vấn mua sắm tự nhiên.
+TikiInsight is an NLP-based system for analyzing customer feedback on baby products from Tiki. The project combines Aspect-Based Sentiment Analysis (ABSA), product review analytics, and a RAG-powered AI shopping assistant to help users understand product strengths, weaknesses, risks, and purchase suitability from real customer reviews.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
 ![PhoBERT](https://img.shields.io/badge/Model-PhoBERT-orange)
 ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql)
+![Qdrant](https://img.shields.io/badge/Vector_DB-Qdrant-red)
 ![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED?logo=docker)
 
-## Bối Cảnh
+## Overview
 
-Trên các sàn thương mại điện tử, người mua thường phải đọc rất nhiều review để trả lời những câu hỏi đơn giản:
+Online shoppers often need to read many product reviews before deciding whether a baby product is worth buying. Reviews can be long, repetitive, mixed in sentiment, and difficult to summarize manually.
 
-- Sản phẩm này có đáng mua không?
-- Người mua khen/chê nhiều nhất ở điểm nào?
-- Có rủi ro gì về kích thước, chất liệu, an toàn, giao hàng hay bao bì không?
-- Sản phẩm có phù hợp với nhu cầu cụ thể như bé da nhạy cảm, cần thấm hút tốt, cần size thoải mái không?
+TikiInsight solves this problem by extracting product aspects from reviews, classifying sentiment for each aspect, summarizing review patterns into a dashboard, and answering product-related questions through an AI shopping assistant.
 
-Review thô thường dài, trùng lặp, cảm xúc lẫn lộn và khó tổng hợp. Vì vậy, TikiInsight được xây dựng để phân tích review theo từng khía cạnh, sau đó biến kết quả phân tích thành dashboard và chatbot tư vấn dễ hiểu.
+## Key Features
 
-
-## Cách Giải Quyết
-
-TikiInsight kết hợp 3 lớp xử lý:
-
-1. **PhoBERT ABSA**
-   - Nhận diện khía cạnh được nhắc đến trong từng câu review.
-   - Phân loại sentiment theo từng khía cạnh: positive, neutral, negative.
-
-2. **Analytics Layer**
-   - Tổng hợp thống kê theo PostgreSQL: top praise, top complaint, tỷ lệ positive/negative theo aspect, review statistics.
-   - Phát hiện risk flags từ các nhóm phản hồi tiêu cực.
-
-3. **AI Shopping Assistant**
-
-    -Trả lời 1 số câu hỏi cơ bản về sản phẩm 
+- Analyze Tiki product reviews from a product URL or product ID.
+- Extract product aspects and classify sentiment using a fine-tuned PhoBERT ABSA model.
+- Visualize product-level sentiment, aspect distribution, strengths, weaknesses, and review evidence.
+- Detect risk signals from negative feedback groups.
+- Provide an AI chatbot assistant for purchase advice, product fit, and review-based Q&A.
+- Combine structured analytics with semantic retrieval through a hybrid RAG pipeline.
 
 ## Demo
 
-![Demo tổng quan](docs/images/demo0.png)
+![Overview Demo](docs/images/demo0.png)
 
 | User Chatbot | Seller Dashboard | Opinion Mining |
 |---|---|---|
 | ![Demo 1](docs/images/demo1.png) | ![Demo 2](docs/images/demo2.png) | ![Demo 3](docs/images/demo3.png) |
 
-## Tính Năng Nổi Bật Của Web App
+## System Architecture
 
-### User
+```text
+Tiki product URL / product ID
+    |
+    v
+Crawl product information and reviews
+    |
+    v
+Preprocess reviews and split sentences
+    |
+    v
+PhoBERT ABSA inference
+    |
+    v
+PostgreSQL analytics + risk detection
+    |
+    v
+Qdrant semantic retrieval
+    |
+    v
+Hybrid RAG ranking and evidence compression
+    |
+    v
+Dashboard + AI Shopping Assistant
+```
 
-- Chatbot hỏi đáp theo sản phẩm đã phân tích.
-- Trả lời bằng tiếng Việt có dấu, thân thiện, giống tư vấn mua sắm.
-- Tóm tắt ưu điểm, điểm cần lưu ý, khuyến nghị và độ tin cậy.
-- Bằng chứng tham khảo được nén ngắn theo khía cạnh, ví dụ: Kích thước, Chất lượng, Bao bì, Giao hàng.
+## Core Technologies
 
-### Seller Dashboard
+| Area | Technologies |
+|---|---|
+| Backend | Python, FastAPI, Pydantic, SQLAlchemy |
+| Frontend | HTML, CSS, JavaScript, Jinja2, Chart.js |
+| NLP / Machine Learning | PhoBERT, PyTorch, Hugging Face Transformers, scikit-learn |
+| RAG / LLM | RAG, hybrid retrieval, Qdrant, Gemini API, Groq API |
+| Database / Cache | PostgreSQL, Redis |
+| Data Processing | pandas, NumPy, regex, pyvi, underthesea |
+| Infrastructure | Docker, Docker Compose |
 
-- Tổng quan thông tin sản phẩm Tiki: tên, giá, rating, số review.
-- Thống kê số review sử dụng, tỷ lệ sentiment và số khía cạnh được nhắc đến.
-- Biểu đồ stacked sentiment theo khía cạnh.
-- RADAR khía cạnh sản phẩm.
-- Danh sách điểm mạnh nổi bật và điểm yếu cần cải thiện.
-- Bảng Opinion Mining chi tiết theo aspect, sentiment, confidence và số lượt nhắc.
-- Review tiêu biểu theo nhóm tích cực, tiêu cực và trung lập.
+## ABSA Models
 
-## Các Mô Hình Phân Tích Cảm Xúc Theo Khía Cạnh
+The project includes several model approaches for research and comparison:
 
-Dự án có các hướng mô hình phục vụ nghiên cứu và so sánh:
-
-| Mô hình | Vai trò | Ghi chú |
+| Model | Role | Notes |
 |---|---|---|
-| PhoBERT fine-tuned | Mô hình ABSA chính trong web app | Dùng để nhận diện aspect và sentiment |
-| BiLSTM-CRF | Baseline sequence labeling | Phục vụ so sánh trong quá trình nghiên cứu |
-| SVM + TF-IDF | Baseline truyền thống | Phục vụ so sánh với hướng deep learning |
+| Fine-tuned PhoBERT | Main ABSA model used by the web app | Aspect extraction and aspect-level sentiment classification |
+| BiLSTM-CRF | Sequence labeling baseline | Used for model comparison |
+| SVM + TF-IDF | Traditional machine learning baseline | Used for comparison with deep learning models |
 
-Kết quả thực nghiệm đã ghi nhận trong project:
+Recorded experiment results:
 
-| Mô hình | Aspect Detection F1 | Aspect Polarity F1 |
+| Model | Aspect Detection F1 | Aspect Polarity F1 |
 |---|---:|---:|
 | PhoBERT | 0.7975 | 0.8519 |
 | BiLSTM-CRF | 0.7636 | 0.7951 |
 | SVM + TF-IDF | 0.7735 | 0.8361 |
 
-## Nhóm Khía Cạnh Được Phân Tích
+## Analyzed Aspects
 
-Một số khía cạnh tiêu biểu:
+The system maps internal aspect labels to user-friendly product insight categories, including:
 
-- Chất lượng sản phẩm
-- Chất liệu
-- Kích thước
-- Độ an toàn
-- Khả năng thấm hút
-- Độ thoải mái
-- Độ bền
-- Giá cả
-- Giao hàng
-- Bao bì
-- Tính chính hãng
+- Product quality
+- Material
+- Size
+- Safety
+- Absorbency
+- Comfort
+- Durability
+- Price
+- Delivery
+- Packaging
+- Authenticity
 
-Trong backend, các aspect có thể được lưu bằng mã nội bộ như `PRODUCT#QUALITY`, nhưng khi hiển thị cho người dùng hệ thống sẽ map sang nhãn thân thiện như **Chất lượng**, **Kích thước**, **Giá cả**, **Giao hàng**.
+## API Endpoints
 
-## Pipeline Xử Lý Dữ Liệu
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Web dashboard |
+| `POST` | `/api/analyze/start` | Start an asynchronous product analysis job |
+| `GET` | `/api/analyze/progress/{job_id}` | Stream analysis progress with SSE |
+| `POST` | `/api/analyze` | Analyze a product directly |
+| `POST` | `/api/assistant/chat` | Ask review-based product questions |
+| `POST` | `/api/assistant/purchase-advice` | Generate purchase advice |
+| `POST` | `/api/assistant/product-fit` | Check whether a product fits user needs |
+| `GET` | `/api/products/{product_id}/risk` | Get risk analysis for a product |
+| `GET` | `/api/health` | Health check |
+
+## Project Structure
 
 ```text
-Thu thập dữ liệu từ Tiki API
-    ↓
-Làm sạch review
-    ↓
-Tách câu và chuẩn hóa tiếng Việt
-    ↓
-Gán nhãn/chuẩn bị dữ liệu ABSA
-    ↓
-Huấn luyện và đánh giá mô hình
-    ↓
-Chạy PhoBERT inference trên review mới
-    ↓
-Tổng hợp aspect sentiment
-    ↓
-Lưu PostgreSQL
-    ↓
-Hiển thị dashboard và phục vụ chatbot
+tiki/
+|-- app/                  # FastAPI app, web UI, assistant services
+|-- data/
+|   |-- samples/          # Small sample data for GitHub/demo
+|-- docs/
+|   |-- images/           # README and demo screenshots
+|-- models/
+|   |-- README.md         # Model artifact instructions
+|-- notebooks/            # Training and experiment notebooks
+|-- src/                  # Training and research code
+|-- Dockerfile
+|-- docker-compose.yml
+|-- requirements.txt
+|-- .env.example
+`-- README.md
 ```
 
-## Core Technologies
+Large datasets, cache files, model checkpoints, and experiment outputs are intentionally excluded from GitHub.
 
-| Nhóm | Công nghệ |
-|---|---|
-| Backend | Python, FastAPI, Pydantic, SQLAlchemy |
-| Frontend | HTML, CSS, JavaScript, Jinja2, Chart.js |
-| NLP / Machine Learning | PhoBERT, PyTorch, Hugging Face Transformers, scikit-learn |
-| LLM / RAG | Gemini/Groq API, intent detection, hybrid retrieval, evidence compression, structured JSON output |
-| Database / Retrieval | PostgreSQL, Qdrant, Redis |
-| Infrastructure | Docker, Docker Compose |
-| Data Processing | pandas, NumPy, regex, pyvi, underthesea |
+## Setup
 
+### 1. Clone the repository
 
+```powershell
+git clone https://github.com/hoaihue04/tiki-nlp-absa.git
+cd tiki-nlp-absa
+```
 
-## Cài Đặt Và Chạy
+### 2. Configure environment variables
 
-### Cách 1: Docker Compose
+Create a local `.env` file from the example:
 
-Yêu cầu:
+```powershell
+copy .env.example .env
+```
+
+Update the values in `.env`, especially the LLM provider and API key:
+
+```text
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### 3. Add model artifacts
+
+The web app requires the fine-tuned PhoBERT checkpoint:
+
+```text
+models/phobert/best_model.pt
+```
+
+Model files are not committed to GitHub because they are large artifacts. See `models/README.md` for the expected structure.
+
+## Run With Docker Compose
+
+Requirements:
 
 - Docker Desktop
-- Model PhoBERT tại `models/phobert/best_model.pt`
+- `.env` file
+- PhoBERT checkpoint at `models/phobert/best_model.pt`
 
-Chạy:
+Start all services:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Mở ứng dụng:
+Open the app:
 
 ```text
 http://127.0.0.1:8001
 ```
 
-Kiểm tra server:
+Health check:
 
 ```text
 http://127.0.0.1:8001/api/health
 ```
 
-### Cách 2: Chạy local
+Stop services:
 
-Tạo môi trường:
+```powershell
+docker compose down
+```
+
+## Run Locally
+
+Create and activate a virtual environment:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Chạy FastAPI:
+Start the FastAPI server:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.app:app --host 127.0.0.1 --port 8001
 ```
 
-Mở:
+Open:
 
 ```text
 http://127.0.0.1:8001
 ```
+
+For local execution, make sure PostgreSQL, Redis, and Qdrant are available and match the connection values in `.env`.
+
+## GitHub Artifact Policy
+
+The repository should contain source code, documentation, configuration examples, notebooks, and small sample data only.
+
+Do not commit:
+
+- `.env`
+- raw, interim, processed, or training datasets
+- cache folders
+- model checkpoints such as `.pt`, `.pth`, `.pkl`, `.bin`
+- experiment outputs and generated result files
+
+## CV Summary
+
+NLP-based Customer Feedback Analysis and AI Chatbot Assistant for Baby Products on Tiki. Built a FastAPI web application using PhoBERT, ABSA, PostgreSQL, Qdrant, and RAG to analyze product reviews, visualize customer insights, detect risk signals, and answer shopping-related questions from review evidence.
