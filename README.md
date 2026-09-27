@@ -6,7 +6,7 @@ TikiInsight is an NLP-based system for analyzing customer feedback on baby produ
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
 ![PhoBERT](https://img.shields.io/badge/Model-PhoBERT-orange)
 ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql)
-![Qdrant](https://img.shields.io/badge/Vector_DB-Qdrant-red)
+![pgvector](https://img.shields.io/badge/Vector_DB-pgvector-336791)
 ![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED?logo=docker)
 
 ## Overview
@@ -50,7 +50,7 @@ PhoBERT ABSA inference
 PostgreSQL analytics + risk detection
     |
     v
-Qdrant semantic retrieval
+PostgreSQL + pgvector semantic retrieval
     |
     v
 Hybrid RAG ranking and evidence compression
@@ -66,7 +66,7 @@ Dashboard + AI Shopping Assistant
 | Backend | Python, FastAPI, Pydantic, SQLAlchemy |
 | Frontend | HTML, CSS, JavaScript, Jinja2, Chart.js |
 | NLP / Machine Learning | PhoBERT, PyTorch, Hugging Face Transformers, scikit-learn |
-| RAG / LLM | RAG, hybrid retrieval, Qdrant, Gemini API, Groq API |
+| RAG / LLM | RAG, hybrid retrieval, pgvector, Gemini API, Groq API |
 | Database / Cache | PostgreSQL, Redis |
 | Data Processing | pandas, NumPy, regex, pyvi, underthesea |
 | Infrastructure | Docker, Docker Compose |
@@ -123,7 +123,13 @@ The system maps internal aspect labels to user-friendly product insight categori
 
 ```text
 tiki/
-|-- app/                  # FastAPI app, web UI, assistant services
+|-- app/                  # FastAPI app and runtime services
+|   |-- api/              # API route modules and request schemas
+|   |-- assistant/        # RAG, LLM, retrieval, scoring, DB services
+|   |-- core/             # Shared app utilities and background jobs
+|   |-- web/              # Dashboard analysis service
+|   |-- static/           # Frontend assets
+|   `-- templates/        # Jinja2 templates
 |-- data/
 |   |-- samples/          # Small sample data for GitHub/demo
 |-- docs/
@@ -132,8 +138,10 @@ tiki/
 |   |-- README.md         # Model artifact instructions
 |-- notebooks/            # Training and experiment notebooks
 |-- src/                  # Training and research code
+|-- tests/                # Lightweight regression tests
 |-- Dockerfile
 |-- docker-compose.yml
+|-- pyproject.toml        # Package and pytest configuration
 |-- requirements.txt
 |-- .env.example
 `-- README.md
@@ -214,12 +222,15 @@ Create and activate a virtual environment:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -e .
 ```
+
+The editable install registers the local `app` and `src` packages, so imports work consistently from scripts, tests, Docker, and IDE tools without manual `sys.path` edits.
 
 Start the FastAPI server:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.app:app --host 127.0.0.1 --port 8001
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
 Open:
@@ -228,7 +239,23 @@ Open:
 http://127.0.0.1:8001
 ```
 
-For local execution, make sure PostgreSQL, Redis, and Qdrant are available and match the connection values in `.env`.
+For local execution, make sure PostgreSQL with pgvector and Redis are available and match the connection values in `.env`.
+
+## Development Checks
+
+Run syntax/import compilation:
+
+```powershell
+.\.venv\Scripts\python.exe -m compileall app src -q
+```
+
+Run the lightweight test suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The current tests cover health routing, product ID parsing, JSON serialization, purchase scoring, and risk detection without requiring live Tiki API calls or model inference.
 
 ## GitHub Artifact Policy
 
@@ -244,4 +271,4 @@ Do not commit:
 
 ## CV Summary
 
-NLP-based Customer Feedback Analysis and AI Chatbot Assistant for Baby Products on Tiki. Built a FastAPI web application using PhoBERT, ABSA, PostgreSQL, Qdrant, and RAG to analyze product reviews, visualize customer insights, detect risk signals, and answer shopping-related questions from review evidence.
+NLP-based Customer Feedback Analysis and AI Chatbot Assistant for Baby Products on Tiki. Built a FastAPI web application using PhoBERT, ABSA, PostgreSQL, pgvector, and RAG to analyze product reviews, visualize customer insights, detect risk signals, and answer shopping-related questions from review evidence.

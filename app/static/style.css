@@ -1118,112 +1118,7 @@ body {
   overflow: hidden;
 }
 
-/* ─── RECOMMENDATIONS ────────────────────── */
-.rec-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.rec-header .panel-title { margin-bottom: 0; }
-
-.rec-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
-}
-
-.rec-card {
-  background: var(--surface3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow .2s, transform .2s, border-color .2s;
-}
-
-.rec-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-2px);
-  border-color: rgba(37,99,235,.3);
-}
-
-.rec-card-img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  background: var(--bg2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  color: var(--text-3);
-}
-
-.rec-card-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.rec-card-body {
-  padding: 12px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.rec-rank {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-3);
-  margin-bottom: 4px;
-}
-
-.rec-rank-1 .rec-rank { color: var(--amber); font-weight: 700; }
-
-.rec-name {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-1);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin-bottom: 8px;
-  flex: 1;
-}
-
-.rec-price {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--tiki-red);
-  margin-bottom: 6px;
-}
-
-.rec-scores {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.rec-score-chip {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--blue-dim);
-  color: var(--blue);
-  font-weight: 500;
-}
-
-.rec-score-chip.top { background: rgba(245,158,11,.12); color: var(--amber); }
-
-/* ─── ANIMATIONS ─────────────────────────── */
+* ─── ANIMATIONS ─────────────────────────── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1258,20 +1153,6 @@ body {
   .chat-form { flex-direction: column; }
   .chat-form button { padding: 10px 18px; }
 }
-/* Ẩn các chỉ số kỹ thuật của recommender */
-.rec-weights {
-  display: none !important;
-}
-
-.rec-scores {
-  display: none !important;
-}
-
-.rec-score-chip {
-  display: none !important;
-}
-/* Thêm vào cuối file style.css */
-
 /* Quote styling trong Strengths/Weaknesses */
 .sw-quote {
   font-size: 12.5px;
@@ -1345,20 +1226,6 @@ body {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-1);
-}
-/* Link hint cho recommendations */
-.rec-link-hint {
-  font-size: 9px;
-  color: var(--text-3);
-  margin-top: 6px;
-  text-align: right;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.rec-card:hover .rec-link-hint {
-  opacity: 1;
-  color: var(--blue);
 }
 /* ─── PRODUCT PRICE PANEL (thay thế score-pill) ─────────────────────── */
 .product-price-panel {
@@ -1456,55 +1323,6 @@ body {
 .meta-chip.product-id::before {
   content: "🔖";
   margin-right: 4px;
-}
-/* Recommendation Banner */
-.recommendation-banner {
-  background: linear-gradient(135deg, var(--green-dim) 0%, var(--surface) 100%);
-  border: 1px solid rgba(5, 150, 105, 0.3);
-  border-radius: var(--r-lg);
-  padding: 20px 28px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  animation: fadeUp 0.4s var(--ease);
-  transition: background .3s, border-color .3s;
-}
-
-.rec-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--green);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 100px;
-  font-weight: 700;
-  font-size: 14px;
-  transition: background .3s;
-  flex-shrink: 0;
-}
-
-.rec-icon { font-size: 20px; }
-
-.rec-message {
-  flex: 1;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--green);
-  transition: color .3s;
-  min-width: 200px;
-}
-
-.rec-score {
-  font-family: var(--font-mono);
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--green);
-  transition: color .3s;
-  white-space: nowrap;
 }
 /* ─── FIX: Đảm bảo hiển thị đầy đủ thông tin ─────────────────────────────── */
 

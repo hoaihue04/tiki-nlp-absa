@@ -26,18 +26,16 @@ from typing import List, Set
 
 import time
 import logging
-from config import get_key_manager, PROVIDERS
+from src.annotation.config import get_key_manager, PROVIDERS
 
 
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from constants import (
+from src.annotation.constants import (
     INPUT_FILE, OUTPUT_JSONL, OUTPUT_CSV, CHECKPOINT_FILE,
     DEFAULT_BATCH_SIZE, CHECKPOINT_INTERVAL, MAX_REVIEW_LENGTH,
 )
-from annotator import annotate_batch, get_current_batch_size
-from config import get_key_manager, PROVIDERS
+from src.annotation.annotator import annotate_batch, get_current_batch_size
+from src.annotation.config import get_key_manager, PROVIDERS
 
 
 # ── Paths ────────────────────────────────────────────────────

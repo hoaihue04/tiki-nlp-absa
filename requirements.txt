@@ -81,7 +81,6 @@ label-studio
 
 openai
 groq>=0.9.0
-qdrant-client>=1.9.0
 sentence-transformers>=2.6.0
 redis>=5.0.0
 
@@ -95,4 +94,5 @@ tqdm>=4.66.0
 python-dotenv>=1.0.0
 emoji                       # xử lý emoji trong review
 rouge_score>=0.1.2          # metric cho generative model (ViT5)
+rapidfuzz>=3.0.0            # string similarity cho RAGAS non-LLM retrieval metrics
 

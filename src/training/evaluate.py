@@ -23,7 +23,6 @@ Phụ thuộc: scikit-learn, numpy, pandas, torch, transformers
 
 import json
 import os
-import sys
 import argparse
 import pickle
 import numpy as np
@@ -166,7 +165,6 @@ def run_bilstm_inference(test_file: str, model_path: str,
                          vocab_path: str) -> Optional[np.ndarray]:
     """Chạy BiLSTM-CRF inference, trả về predictions [N, 17]."""
     try:
-        sys.path.insert(0, '.')
         from src.training.train_bilstm import (
             BiLSTMDataset, BiLSTMCRFModel, collate_fn, CFG
         )
@@ -203,7 +201,6 @@ def run_phobert_inference(csv_path: str, model_path: str) -> Optional[np.ndarray
     """Chạy PhoBERT inference, trả về predictions [N, 17]."""
     try:
         from transformers import AutoTokenizer
-        sys.path.insert(0, '.')
         from src.training.train_phobert import PhoBERTDataset, PhoBERTASQP, CFG
         from torch.utils.data import DataLoader
 
@@ -241,7 +238,6 @@ def run_svm_inference(csv_path: str, model_path: str) -> Optional[np.ndarray]:
     Không cần GPU — chạy trên CPU.
     """
     try:
-        sys.path.insert(0, '.')
         # Import SVMTFIDFModel từ train_svm_tfidf.py
         from src.training.train_svm_tfidf import SVMTFIDFModel
 

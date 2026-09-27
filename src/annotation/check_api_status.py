@@ -1,6 +1,6 @@
 import time
 import requests
-from config import get_key_manager, PROVIDERS
+from src.annotation.config import get_key_manager, PROVIDERS
 
 # ─────────────────────────────────────────────
 # ⚙️ CONFIG

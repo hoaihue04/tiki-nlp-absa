@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Dict, List, Optional, Tuple
 import httpx
 
-from config import get_key_manager, KeySlot, PROVIDERS
-from constants import ASPECT_CATEGORIES, MAX_REVIEW_LENGTH
+from src.annotation.config import get_key_manager, KeySlot, PROVIDERS
+from src.annotation.constants import ASPECT_CATEGORIES, MAX_REVIEW_LENGTH
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,16 @@
+[project]
+name = "tiki-insight"
+version = "0.1.0"
+description = "ABSA dashboard and AI shopping assistant for Tiki product reviews"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

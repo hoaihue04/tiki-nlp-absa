@@ -1,12 +1,8 @@
 import pandas as pd
 import numpy as np
 import re
-import os
-import sys
 
 
-# Add project root vào path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 # IMPORT CONSTANTS (đúng theo project của bạn)
 from src.utils.constants import (
     TIKI_REVIEWS_FILE,
