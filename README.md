@@ -1,6 +1,6 @@
-# TikiInsight - ABSA Dashboard & AI Shopping Assistant
+# ABSA Dashboard & AI Shopping Assistant
 
-TikiInsight is an NLP-based system for analyzing customer feedback on baby products from Tiki. The project combines Aspect-Based Sentiment Analysis (ABSA), product review analytics, and a RAG-powered AI shopping assistant to help users understand product strengths, weaknesses, risks, and purchase suitability from real customer reviews.
+An NLP-based system for analyzing customer feedback on baby products from e-commerce platform. The project combines Aspect-Based Sentiment Analysis (ABSA), product review analytics, and a RAG-powered AI shopping assistant to help users understand product strengths, weaknesses and purchase suitability from real customer reviews.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
@@ -13,11 +13,11 @@ TikiInsight is an NLP-based system for analyzing customer feedback on baby produ
 
 Online shoppers often need to read many product reviews before deciding whether a baby product is worth buying. Reviews can be long, repetitive, mixed in sentiment, and difficult to summarize manually.
 
-TikiInsight solves this problem by extracting product aspects from reviews, classifying sentiment for each aspect, summarizing review patterns into a dashboard, and answering product-related questions through an AI shopping assistant.
+Project solves this problem by extracting product aspects from reviews, classifying sentiment for each aspect, summarizing review patterns into a dashboard, and answering product-related questions through an AI shopping assistant.
 
 ## Key Features
 
-- Analyze Tiki product reviews from a product URL or product ID.
+- Analyze baby product reviews from a product URL or product ID.
 - Extract product aspects and classify sentiment using a fine-tuned PhoBERT ABSA model.
 - Visualize product-level sentiment, aspect distribution, strengths, weaknesses, and review evidence.
 - Detect risk signals from negative feedback groups.
@@ -35,7 +35,7 @@ TikiInsight solves this problem by extracting product aspects from reviews, clas
 ## System Architecture
 
 ```text
-Tiki product URL / product ID
+Product URL / product ID
     |
     v
 Crawl product information and reviews
