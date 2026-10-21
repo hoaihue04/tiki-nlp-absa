@@ -1,14 +1,6 @@
 import pandas as pd
 import regex as re
 import emoji
-import sys
-import os
-
-# FIX PATH
-current_file_dir = os.path.dirname(os.path.abspath(__file__))
-project_root_dir = os.path.abspath(os.path.join(current_file_dir, "../../"))
-if project_root_dir not in sys.path:
-    sys.path.append(project_root_dir)
 
 from src.utils.constants import CLEANED_REVIEWS_FILE, NORMALIZED_REVIEWS_FILE
 

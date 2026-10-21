@@ -574,53 +574,6 @@ function renderReviews(data) {
   }).join("");
 }
 
-// ─── Render: Recommendations ───────────────────────────────────────────────
-function renderRecommendations(data) {
-  const rec = data.recommendations || {};
-  
-  const weightsEl = document.getElementById("rec-weights");
-  if (weightsEl) {
-    weightsEl.style.display = "none";
-  }
-
-  const products = (rec.top_products || []).slice(0, 5);
-  const container = document.getElementById("recommend-grid");
-
-  if (!products.length) {
-    container.innerHTML = `<p style="color:var(--text-3)">Không tìm thấy sản phẩm gợi ý cùng danh mục.</p>`;
-    return;
-  }
-
-  container.innerHTML = products.map((r, i) => {
-    const searchQuery = encodeURIComponent(r.name || "");
-    const searchUrl = `https://tiki.vn/search?q=${searchQuery}`;
-    
-    const imgSrc = r.thumbnail_url || "";
-    const proxiedImg = imgSrc ? proxyImg(imgSrc) : "";
-    const price = fmtPrice(r.price);
-
-    return `
-      <a class="rec-card ${i === 0 ? "rec-rank-1" : ""}" 
-         href="${escHtml(searchUrl)}" 
-         target="_blank" 
-         rel="noopener noreferrer">
-        <div class="rec-card-img">
-          ${proxiedImg
-            ? `<img src="${escHtml(proxiedImg)}" alt="${escHtml(r.name || "")}" loading="lazy" onerror="this.parentElement.innerHTML='🛍️'"/>`
-            : "🛍️"
-          }
-        </div>
-        <div class="rec-card-body">
-          <div class="rec-rank">${i === 0 ? "🥇 Gợi ý #1" : `✨ Gợi ý #${i + 1}`}</div>
-          <div class="rec-name">${escHtml(r.name || "—")}</div>
-          ${price ? `<div class="rec-price">${price}</div>` : ""}
-          <div class="rec-link-hint">🔍 Tìm kiếm trên Tiki</div>
-        </div>
-      </a>
-    `;
-  }).join("");
-}
-
 function setActiveTab(tabId) {
   document.querySelectorAll(".audience-tab").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tabId);
@@ -817,7 +770,7 @@ if (chatForm) {
   });
 }
 
-// Hàm renderAll (đã loại bỏ recommendation banner)
+// Hàm renderAll
 function renderAll(data) {
   if (!data) { 
     console.error("renderAll: data is null"); 
