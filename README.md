@@ -1,6 +1,6 @@
-# TikiInsight - ABSA Dashboard & AI Shopping Assistant
+# ReviewInsight - ABSA Dashboard & AI Shopping Assistant
 
-TikiInsight is an NLP-based system for analyzing customer feedback on baby products from Tiki. The project combines Aspect-Based Sentiment Analysis (ABSA), product review analytics, and a RAG-powered AI shopping assistant to help users understand product strengths, weaknesses, risks, and purchase suitability from real customer reviews.
+ReviewInsight is an NLP-based system for analyzing customer feedback on baby products from an e-commerce platform. The project combines Aspect-Based Sentiment Analysis (ABSA), product review analytics, and a RAG-powered AI shopping assistant to help users understand product strengths, weaknesses, risks, and purchase suitability from real customer reviews.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
@@ -13,11 +13,11 @@ TikiInsight is an NLP-based system for analyzing customer feedback on baby produ
 
 Online shoppers often need to read many product reviews before deciding whether a baby product is worth buying. Reviews can be long, repetitive, mixed in sentiment, and difficult to summarize manually.
 
-TikiInsight solves this problem by extracting product aspects from reviews, classifying sentiment for each aspect, summarizing review patterns into a dashboard, and answering product-related questions through an AI shopping assistant.
+ReviewInsight solves this problem by extracting product aspects from reviews, classifying sentiment for each aspect, summarizing review patterns into a dashboard, and answering product-related questions through an AI shopping assistant.
 
 ## Key Features
 
-- Analyze Tiki product reviews from a product URL or product ID.
+- Analyze product reviews from a product URL or product ID.
 - Extract product aspects and classify sentiment using a fine-tuned PhoBERT ABSA model.
 - Visualize product-level sentiment, aspect distribution, strengths, weaknesses, and review evidence.
 - Detect risk signals from negative feedback groups.
@@ -28,14 +28,14 @@ TikiInsight solves this problem by extracting product aspects from reviews, clas
 
 ![Overview Demo](docs/images/demo0.png)
 
-| User Chatbot | Seller Dashboard | Opinion Mining |
+| Chatbot | Dashboard | Opinion Mining |
 |---|---|---|
 | ![Demo 1](docs/images/demo1.png) | ![Demo 2](docs/images/demo2.png) | ![Demo 3](docs/images/demo3.png) |
 
 ## System Architecture
 
 ```text
-Tiki product URL / product ID
+Product URL / product ID
     |
     v
 Crawl product information and reviews
@@ -105,24 +105,12 @@ The system maps internal aspect labels to user-friendly product insight categori
 - Packaging
 - Authenticity
 
-## API Endpoints
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/` | Web dashboard |
-| `POST` | `/api/analyze/start` | Start an asynchronous product analysis job |
-| `GET` | `/api/analyze/progress/{job_id}` | Stream analysis progress with SSE |
-| `POST` | `/api/analyze` | Analyze a product directly |
-| `POST` | `/api/assistant/chat` | Ask review-based product questions |
-| `POST` | `/api/assistant/purchase-advice` | Generate purchase advice |
-| `POST` | `/api/assistant/product-fit` | Check whether a product fits user needs |
-| `GET` | `/api/products/{product_id}/risk` | Get risk analysis for a product |
-| `GET` | `/api/health` | Health check |
 
 ## Project Structure
 
 ```text
-tiki/
+project/
 |-- app/                  # FastAPI app and runtime services
 |   |-- api/              # API route modules and request schemas
 |   |-- assistant/        # RAG, LLM, retrieval, scoring, DB services
@@ -137,7 +125,7 @@ tiki/
 |-- models/
 |   |-- README.md         # Model artifact instructions
 |-- notebooks/            # Training and experiment notebooks
-|-- src/                  # Training and research code
+|-- src/                  # Training model
 |-- tests/                # Lightweight regression tests
 |-- Dockerfile
 |-- docker-compose.yml
@@ -154,8 +142,8 @@ Large datasets, cache files, model checkpoints, and experiment outputs are inten
 ### 1. Clone the repository
 
 ```powershell
-git clone https://github.com/hoaihue04/tiki-nlp-absa.git
-cd tiki-nlp-absa
+git clone <repository-url>
+cd <repository-directory>
 ```
 
 ### 2. Configure environment variables
@@ -255,20 +243,10 @@ Run the lightweight test suite:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-The current tests cover health routing, product ID parsing, JSON serialization, purchase scoring, and risk detection without requiring live Tiki API calls or model inference.
+The current tests cover health routing, product ID parsing, JSON serialization, purchase scoring, and risk detection without requiring live platform API calls or model inference.
 
-## GitHub Artifact Policy
 
-The repository should contain source code, documentation, configuration examples, notebooks, and small sample data only.
-
-Do not commit:
-
-- `.env`
-- raw, interim, processed, or training datasets
-- cache folders
-- model checkpoints such as `.pt`, `.pth`, `.pkl`, `.bin`
-- experiment outputs and generated result files
 
 ## CV Summary
 
-NLP-based Customer Feedback Analysis and AI Chatbot Assistant for Baby Products on Tiki. Built a FastAPI web application using PhoBERT, ABSA, PostgreSQL, pgvector, and RAG to analyze product reviews, visualize customer insights, detect risk signals, and answer shopping-related questions from review evidence.
+NLP-based Customer Feedback Analysis and AI Chatbot Assistant for Baby Products. Built a FastAPI web application using PhoBERT, ABSA, PostgreSQL, pgvector, and RAG to analyze product reviews, visualize customer insights, detect risk signals, and answer shopping-related questions from review evidence.
